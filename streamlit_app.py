@@ -1,3 +1,3 @@
 import streamlit as st
-st.title('app name')
+st.title('Predict Fare of Ailines Tickets')
 st.write('this is my first app')
