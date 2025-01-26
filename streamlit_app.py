@@ -16,4 +16,4 @@ if st.button("Submit"):
     st.write("Destination:", user_destination)
     
     # Add a link button to check ticket fare
-    #st.markdown("[Check the ticket fare](https://streamlit.io/gallery)")
+    st.markdown("[Check the ticket fare](https://streamlit.io/gallery)")
