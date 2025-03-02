@@ -47,7 +47,8 @@ st.title("Flight Price Prediction App")
 st.subheader("Upload Dataset or Use Default Dataset")
 
 # Provide the raw URL of the dataset from GitHub
-github_url = "https://github.com/hemanth18-web/dp-ml/blob/main/Data_Train%20(1).xlsx"
+github_url = "https://raw.githubusercontent.com/hemanth18-web/dp-ml/main/Data_Train(1).xlsx"
+
 
 # File uploader
 uploaded_file = st.file_uploader("Upload your dataset (Excel format)", type=["xlsx"])
