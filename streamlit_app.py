@@ -122,6 +122,8 @@ if data is not None:
     st.write("### 🤖 Model Training")
     rf_model = RandomForestRegressor()
     dt_model = DecisionTreeRegressor()
+    st.write("RandomForestRegressor")
+    st.write("DecisionTreeRegressor")
 
     rf_model.fit(X_train, y_train)
     dt_model.fit(X_train, y_train)
