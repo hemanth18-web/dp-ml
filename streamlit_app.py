@@ -85,7 +85,7 @@ if data is not None:
     new_data.drop(['Duration'], axis=1, inplace=True)
 
     # Encode categorical columns
-    st.write("Encoding categorical columns...")
+    #st.write("Encoding categorical columns...")
     new_data['Airline'] = new_data['Airline'].astype('category').cat.codes
     new_data['Source'] = new_data['Source'].astype('category').cat.codes
     new_data['Destination'] = new_data['Destination'].astype('category').cat.codes
@@ -114,6 +114,8 @@ if data is not None:
     st.write("### Model Training")
     rf_model = RandomForestRegressor()
     dt_model = DecisionTreeRegressor()
+    st.write("RandomForestRegressor")
+    st.write("DecisionTreeRegressor")
 
     rf_model.fit(X_train, y_train)
     dt_model.fit(X_train, y_train)
