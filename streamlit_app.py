@@ -141,6 +141,10 @@ if data is not None:
     st.write(f"**Selected Model:** {best_model['model_name']}")
     st.write(f"**Training Score:** {best_model['training_score']:.2f}")
 
+    # Create a mapping of airline names to their encoded values
+    airline_mapping = dict(enumerate(data['Airline'].astype('category').cat.categories))
+    reverse_airline_mapping = {v: k for k, v in airline_mapping.items()}
+
     # Prediction Function
     def predict_price(source, destination, stops, airline, dep_hour, dep_minute, arrival_hour, arrival_minute, duration_hours, duration_minutes, journey_day, journey_month):
         """
@@ -188,7 +192,7 @@ if data is not None:
     source = st.selectbox("Source", ["Banglore", "Delhi", "Kolkata", "Mumbai", "Chennai"])
     destination = st.selectbox("Destination", ["Banglore", "Delhi", "Kolkata", "Mumbai", "Chennai"])
     stops = st.selectbox("Total Stops", ["non-stop", "1 stop", "2 stops", "3 stops", "4 stops"])
-    airline = st.selectbox("Airline", new_data['Airline'].unique())
+    airline = st.selectbox("Airline", list(airline_mapping.values()))  # Show airline names in the dropdown
     dep_hour = st.slider("Departure Hour", 0, 23, 10)
     dep_minute = st.slider("Departure Minute", 0, 59, 30)
     arrival_hour = st.slider("Arrival Hour", 0, 23, 13)
@@ -202,10 +206,13 @@ if data is not None:
     stop_mapping = {'non-stop': 0, '1 stop': 1, '2 stops': 2, '3 stops': 3, '4 stops': 4}
     stops_mapped = stop_mapping[stops]
 
+    # Map the selected airline name to its encoded value
+    airline_encoded = reverse_airline_mapping[airline]
+
     # Predict the price when the button is clicked
     if st.button("Predict Price"):
         predicted_price = predict_price(
-            source, destination, stops_mapped, airline, dep_hour, dep_minute,
+            source, destination, stops_mapped, airline_encoded, dep_hour, dep_minute,
             arrival_hour, arrival_minute, duration_hours, duration_minutes,
             journey_day, journey_month
         )
