@@ -108,6 +108,29 @@ if uploaded_file is not None:
 
     best_model = rf_model if rf_r2 > dt_r2 else dt_model
 
+    # Prediction Function
+    def predict_price(source, destination, stops, airline, dep_hour, dep_minute, arrival_hour, arrival_minute, duration_hours, duration_minutes, journey_day, journey_month):
+        input_data = {
+            "Source": source,
+            "Destination": destination,
+            "Total_Stops": stops,
+            "Airline": airline,
+            "Dep_Time_hour": dep_hour,
+            "Dep_Time_minute": dep_minute,
+            "Arrival_Time_hour": arrival_hour,
+            "Arrival_Time_minute": arrival_minute,
+            "Duration_hours": duration_hours,
+            "Duration_mins": duration_minutes,
+            "Journey_day": journey_day,
+            "Journey_month": journey_month
+        }
+        input_df = pd.DataFrame([input_data])
+        for col in X.columns:
+            if col not in input_df.columns:
+                input_df[col] = 0
+        input_df = input_df[X.columns]
+        return best_model.predict(input_df)[0]
+
     # User Input for Prediction
     st.write("### Predict Flight Price")
     source = st.selectbox("Source", ["Banglore", "Delhi", "Kolkata", "Mumbai", "Chennai"])
@@ -127,22 +150,11 @@ if uploaded_file is not None:
     stops_mapped = stop_mapping[stops]
 
     if st.button("Predict Price"):
-        input_data = {
-            "Source": source,
-            "Destination": destination,
-            "Total_Stops": stops_mapped,
-            "Airline": airline,
-            "Dep_Time_hour": dep_hour,
-            "Dep_Time_minute": dep_minute,
-            "Arrival_Time_hour": arrival_hour,
-            "Arrival_Time_minute": arrival_minute,
-            "Duration_hours": duration_hours,
-            "Duration_mins": duration_minutes,
-            "Journey_day": journey_day,
-            "Journey_month": journey_month
-        }
-        input_df = pd.DataFrame([input_data])
-        predicted_price = best_model.predict(input_df)[0]
+        predicted_price = predict_price(
+            source, destination, stops_mapped, airline, dep_hour, dep_minute,
+            arrival_hour, arrival_minute, duration_hours, duration_minutes,
+            journey_day, journey_month
+        )
         st.success(f"The predicted price for the flight is: ₹{predicted_price:.2f}")
 
 else:
