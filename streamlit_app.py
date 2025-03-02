@@ -9,6 +9,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.feature_selection import mutual_info_regression
 from sklearn import metrics
 import warnings
+import requests
 
 warnings.filterwarnings("ignore")
 
@@ -16,13 +17,27 @@ warnings.filterwarnings("ignore")
 st.title("Flight Price Prediction App")
 st.write("This app allows you to preprocess flight data, train models, and predict flight prices.")
 
-# File uploader for dataset
-uploaded_file = st.file_uploader("Upload your dataset (Excel format)", type=["xlsx"])
+# Function to fetch the file from GitHub using the API
+def fetch_file_from_github(repo, path, branch="main"):
+    url = f"https://api.github.com/repos/{repo}/contents/{path}?ref={branch}"
+    headers = {"Accept": "application/vnd.github.v3.raw"}
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        with open("temp_data.xlsx", "wb") as f:
+            f.write(response.content)  # Save the file locally
+        data = pd.read_excel("temp_data.xlsx")  # Read the file with Pandas
+        return data
+    else:
+        st.error("Failed to fetch the dataset from GitHub.")
+        return None
 
-if uploaded_file is not None:
-    # Load the dataset
-    data = pd.read_excel(uploaded_file)
-    st.success("Dataset uploaded successfully!")
+# Example usage
+repo = "hemanth18-web/dp-ml"  # Replace with your GitHub repo
+path = "Data_Train(1).xlsx"  # Path to the file in the repo
+data = fetch_file_from_github(repo, path)
+
+if data is not None:
+    st.success("Dataset loaded successfully from GitHub!")
     st.write("### Dataset Preview:")
     st.dataframe(data.head())
 
@@ -189,4 +204,4 @@ if uploaded_file is not None:
         st.success(f"The predicted price for the flight is: ₹{predicted_price:.2f}")
 
 else:
-    st.warning("Please upload a dataset to proceed.")
+    st.error("Failed to load the dataset from GitHub.")
