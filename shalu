@@ -1,0 +1,323 @@
+#!pip install openpyxl
+#%cd c:/users/hemanth.uppala/appdata/local/programs/python/python313/lib/site-packages
+import pandas as pd
+import numpy as np
+import openpyxl
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+data = pd.read_excel(r"C:\Users\hemanth.uppala\Desktop\Shaline\Flight_Price_resources/Data_Train.xlsx")
+print(data.head(5))
+data.info()
+data.isnull()
+data.isnull().sum()
+data['Total_Stops'].isnull()
+data[data['Total_Stops'].isnull()]
+data.dropna(inplace=True)
+data.info()
+data.isnull().sum()
+new_data = data.copy()
+new_data.columns
+new_data.head(2)
+new_data.dtypes
+def change_into_datetime(col):
+    new_data[col] = pd.to_datetime(new_data[col])
+    
+import warnings
+from warnings import filterwarnings
+filterwarnings("ignore")
+
+new_data.columns
+for feature in ['Date_of_Journey','Dep_Time','Arrival_Time']:
+    change_into_datetime(feature)
+new_data.dtypes
+new_data["Journey_day"]=new_data['Date_of_Journey'].dt.day
+new_data["Journey_month"]=new_data['Date_of_Journey'].dt.month
+new_data["Journey_year"]=new_data['Date_of_Journey'].dt.year
+new_data.head(3)
+def extract_hour_min(df, col):
+    df[col+"_hour"]= df[col].dt.hour
+    df[col+"_minute"]= df[col].dt.minute
+    return df.head(3)
+extract_hour_min(new_data, "Dep_Time")
+extract_hour_min(new_data, "Arrival_Time")
+col_to_drop=['Dep_Time','Arrival_Time']
+new_data.drop(col_to_drop,axis=1,inplace=True)
+new_data.head(3)
+new_data.columns
+def flight_dep_time(x):
+    if (x>4) and (x<=8):
+        return "Early morning"
+    elif (x>8) and (x<=12):
+        return "Morning"
+    elif (x>12) and (x<=16):
+        return "Noon"
+    elif (x>16) and (x<=20):
+        return "Evening"
+    elif (x>20) and (x<=24):
+        return "Night"
+    else:
+        return "late night"
+import importlib
+new_data['Dep_Time_hour'].apply(flight_dep_time).value_counts().plot(kind="bar",color="g")
+def process_duration(x):
+    if 'h' not in x:
+        x = '0h' + ' ' + x
+    elif 'm' not in x:
+        x = x + ' ' +'0m'
+
+    return x 
+new_data['Duration'].apply(process_duration)
+new_data['Duration'][0]
+int('2h 50m'.split(' ')[1][0:-1])
+new_data['Duration_hours']=new_data['Duration'].apply(lambda x : int(x.split(' ')[0][0:-1]))
+new_data['Duration_mins']=new_data['Duration'].apply(lambda x: int(x.split(' ')[1][0:-1]) if len(x.split(' ')) > 1 else int(x.split(' ')[0][0:-1]))
+
+new_data.head(3)
+new_data['Duration_total_mins']=new_data['Duration'].str.replace('h','*60').str.replace(' ' ,'+').str.replace('m','*1').apply(eval)
+
+sns.scatterplot(x="Duration_total_mins", y="Price", data=new_data)
+sns.scatterplot(x="Duration_total_mins", y="Price", hue="Total_Stops",data=new_data)
+new_data.columns
+new_data[new_data['Airline']=="Jet Airways"].groupby('Route').size().sort_values(ascending=False)
+new_data.columns
+sns.boxplot(y='Price' , x='Airline' ,data=new_data.sort_values('Price',ascending=False))
+plt.xticks(rotation="vertical")
+plt.show()
+cat_col= [col for col in new_data.columns if new_data[col].dtype=="object"]
+new_data['Source'].unique()
+[col for col in new_data.columns if new_data[col].dtype!="object"]
+new_data['Source'].apply(lambda x: 1 if x=='Banglore' else 0)
+for sub_category in new_data['Source'].unique():
+    new_data['Source_'+sub_category]= new_data['Source'].apply(lambda x : 1 if x==sub_category else 0)
+new_data.head(2)
+new_data.columns
+
+new_data['Airline'].nunique()
+airlines = new_data.groupby(['Airline'])['Price'].mean().sort_values().index
+dict_airlines = {key:index for index, key in enumerate(airlines, 0)}
+new_data['Airline'] = new_data['Airline'].map(dict_airlines)
+new_data['Airline']
+new_data['Destination'].unique()
+new_data['Destination'].replace('New Delhi', 'Delhi' , inplace=True)
+new_data['Destination'].unique()
+dest = new_data.groupby(['Destination'])['Price'].mean().sort_values().index
+dict_dest= {key:index for index, key in enumerate(dest, 0)}
+new_data['Destination'] = new_data['Destination'].map(dict_dest)
+new_data.head(3)
+new_data['Total_Stops'].unique()
+stop = {'non-stop':0, '2 stops':2, '1 stop':1, '3 stops':3, '4 stops':4}
+new_data['Total_Stops'] = new_data['Total_Stops'].map(stop)
+new_data['Additional_Info'].value_counts()/len(new_data)*100
+new_data.drop(columns=['Date_of_Journey','Additional_Info','Duration_total_mins','Source','Journey_year'] , axis=1 , inplace=True)
+new_data.drop(columns=['Route'] ,axis=1 , inplace=True)
+new_data.drop(columns=['Duration'] ,axis=1 , inplace=True)
+def plot(df , col):
+    fig ,(ax1 , ax2 , ax3) = plt.subplots(3,1)
+    sns.distplot(df[col], ax=ax1)
+    sns.boxplot(df[col], ax=ax2)
+    sns.distplot(df[col], ax=ax3, kde=False)
+plot(new_data,'Price')
+
+q1 = new_data['Price'].quantile(0.25)
+q3 = new_data['Price'].quantile(0.75)
+
+iqr = q3- q1
+
+maximum = q3 + 1.5*iqr
+minimum = q1 - 1.5*iqr
+print(maximum)
+print([price for price in new_data['Price'] if price> maximum or price<minimum])
+len([price for price in new_data['Price'] if price> maximum or price<minimum])
+new_data['Price'] = np.where(new_data['Price']>=35000, new_data['Price'].median() , new_data['Price'])
+plot(new_data, 'Price')
+X = new_data.drop(['Price'], axis=1)
+y = new_data['Price']
+from sklearn.feature_selection import mutual_info_regression
+
+imp = mutual_info_regression(X,y)
+imp_df = pd.DataFrame(imp ,index=X.columns)
+imp_df.columns = ['importance']
+imp_df.sort_values(by='importance',ascending=False)
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train , y_test = train_test_split(
+    X, y, test_size=0.25, random_state=42)
+from sklearn.ensemble import RandomForestRegressor
+ml_model = RandomForestRegressor()
+ml_model.fit(X_train ,y_train)
+y_pred = ml_model.predict(X_test)
+y_pred
+from sklearn import metrics
+metrics.r2_score(y_test,y_pred)
+#!pip install pickle
+import pickle
+file = open(r'C:\Users\hemanth.uppala\Desktop\Shaline/rf_random.pk1', 'wb')
+pickle.dump(ml_model,file)
+model = open(r'C:\Users\hemanth.uppala\Desktop\Shaline/rf_random.pk1', 'rb')
+forest = pickle.load(model)
+y_pred2 = forest.predict(X_test)
+metrics.r2_score(y_test,y_pred2)
+def mape(y_true, y_pred):
+    y_true ,y_pred = np.array(y_true) , np.array(y_pred)
+    return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+mape(y_test, y_pred)
+from sklearn import metrics
+'''
+def predict(ml_model):
+    model = ml_model.fit(X_train ,y_train)
+    print('Traning score : {}'.format(model.score(X_train, y_train)))
+    y_predection =model.predict(X_test)
+    print('prediction are : {}'.format(y_predection))
+    print('\n')
+    r2_score= metrics.r2_score(y_test, y_predection)
+    print('r2_score :{}'.format(r2_score))
+    print('MAE :{}'.format(metrics.mean_absolute_error(y_test, y_predection)))
+    print('MSE :{}'.format(metrics.mean_squared_error(y_test, y_predection)))
+    print('RMSE :{}'.format(np.sqrt(metrics.mean_squared_error(y_test, y_predection))))
+    print('MAPE :{}'.format(mape(y_test, y_predection)))
+    sns.displot(y_test-y_predection)
+    plt.show()
+predict(RandomForestRegressor())
+from sklearn.tree import DecisionTreeRegressor
+predict(DecisionTreeRegressor())
+'''
+
+# Define the function
+from sklearn.tree import DecisionTreeRegressor
+def evaluate_model(ml_model, model_name):
+    model = ml_model.fit(X_train, y_train)
+    training_score = model.score(X_train, y_train)
+    
+    y_prediction = model.predict(X_test)
+    r2_score = metrics.r2_score(y_test, y_prediction)
+    mae = metrics.mean_absolute_error(y_test, y_prediction)
+    mse = metrics.mean_squared_error(y_test, y_prediction)
+    rmse = np.sqrt(mse)
+    mape_value = mape(y_test, y_prediction)
+    
+    # Store all results in a dictionary
+    results = {
+        "model_name": model_name,
+        "training_score": training_score,
+        "y_prediction": y_prediction,
+        "r2_score": r2_score,
+        "mae": mae,
+        "mse": mse,
+        "rmse": rmse,
+        "mape": mape_value,
+        "residuals": y_test - y_prediction
+    }
+    
+    return results
+
+# Compare the models
+rf_model = RandomForestRegressor()
+dt_model = DecisionTreeRegressor()
+
+rf_results = evaluate_model(rf_model, "Random Forest Regressor")
+dt_results = evaluate_model(dt_model, "Decision Tree Regressor")
+
+# Determine which model has the higher training score
+if rf_results["training_score"] > dt_results["training_score"]:
+    best_model = rf_results
+else:
+    best_model = dt_results
+
+# Print the results of the best model
+print(f"Best Model: {best_model['model_name']}")
+print(f"Training Score: {best_model['training_score']}")
+print(f"prediction are : {best_model['y_prediction']}")
+print('\n')
+print(f"R2 Score: {best_model['r2_score']}")
+print(f"MAE: {best_model['mae']}")
+print(f"MSE: {best_model['mse']}")
+print(f"RMSE: {best_model['rmse']}")
+print(f"MAPE: {best_model['mape']}")
+
+# Plot residuals for the best model
+sns.displot(best_model["residuals"])
+plt.title(f"Residuals for {best_model['model_name']}")
+plt.show()
+
+def predict_price_with_best_model(source, destination, stops, airline, dep_hour, dep_minute, arrival_hour, arrival_minute, duration_hours, duration_minutes, journey_day, journey_month):
+    """
+    Predict the flight price based on user input for source, destination, stops, airline, and time details.
+    The prediction is made using the model with the highest training score.
+    
+    Parameters:
+    - source: str, source city
+    - destination: str, destination city
+    - stops: int, number of stops (e.g., 0 for non-stop, 1 for 1 stop, etc.)
+    - airline: str, airline name
+    - dep_hour: int, departure hour
+    - dep_minute: int, departure minute
+    - arrival_hour: int, arrival hour
+    - arrival_minute: int, arrival minute
+    - duration_hours: int, duration in hours
+    - duration_minutes: int, duration in minutes
+    - journey_day: int, day of the journey
+    - journey_month: int, month of the journey
+    
+    Returns:
+    - Predicted price of the flight
+    """
+    # Determine the best model based on training score
+    best_model = rf_model if rf_results["training_score"] > dt_results["training_score"] else dt_model
+    
+    # Map the input values to the encoded values used in the model
+    source_col = f"Source_{source}"
+    destination_col = f"Destination_{destination}"
+    
+    # Create a dictionary for the input data
+    input_data = {
+        "Total_Stops": stops,
+        "Airline": dict_airlines.get(airline, -1),  # Map airline to its encoded value
+        "Dep_Time_hour": dep_hour,
+        "Dep_Time_minute": dep_minute,
+        "Arrival_Time_hour": arrival_hour,
+        "Arrival_Time_minute": arrival_minute,
+        "Duration_hours": duration_hours,
+        "Duration_mins": duration_minutes,
+        "Journey_day": journey_day,
+        "Journey_month": journey_month,
+    }
+    
+    # Add one-hot encoded columns for Source and Destination
+    for col in new_data.columns:
+        if col.startswith("Source_"):
+            input_data[col] = 1 if col == source_col else 0
+        if col.startswith("Destination_"):
+            input_data[col] = 1 if col == destination_col else 0
+    
+    # Ensure all features used during training are present in the input data
+    for col in X.columns:  # `X` is the training data used for the model
+        if col not in input_data:
+            input_data[col] = 0  # Add missing features with a default value of 0
+    
+    # Remove any extra features that were not part of the training data
+    input_data = {key: input_data[key] for key in X.columns}
+    
+    # Convert the input data to a DataFrame
+    input_df = pd.DataFrame([input_data])
+    
+    # Predict the price using the best model
+    predicted_price = best_model.predict(input_df)[0]
+    
+    return predicted_price
+
+# Example usage
+source = "Banglore"  # Example source
+destination = "Delhi"  # Example destination
+stops = 1  # Example: 1 stop
+airline = "Jet Airways"  # Example airline
+dep_hour = 10  # Example departure hour
+dep_minute = 30  # Example departure minute
+arrival_hour = 13  # Example arrival hour
+arrival_minute = 45  # Example arrival minute
+duration_hours = 3  # Example duration in hours
+duration_minutes = 15  # Example duration in minutes
+journey_day = 15  # Example journey day
+journey_month = 3  # Example journey month
+
+predicted_price = predict_price_with_best_model(source, destination, stops, airline, dep_hour, dep_minute, arrival_hour, arrival_minute, duration_hours, duration_minutes, journey_day, journey_month)
+print(f"The predicted price for the flight is: ₹{predicted_price:.2f}")
