@@ -209,10 +209,14 @@ if data is not None:
     stop_mapping = {'non-stop': 0, '1 stop': 1, '2 stops': 2, '3 stops': 3, '4 stops': 4}
     stops_mapped = stop_mapping[stops]
 
+    # Encode the selected airline name to its numerical value
+    airline_mapping = dict(enumerate(data['Airline'].astype('category').cat.categories))
+    airline_encoded = {v: k for k, v in airline_mapping.items()}[airline]
+
     # Predict the price when the button is clicked
     if st.sidebar.button("Predict Price"):
         predicted_price = predict_price(
-            source, destination, stops_mapped, airline, dep_hour, dep_minute,
+            source, destination, stops_mapped, airline_encoded, dep_hour, dep_minute,
             arrival_hour, arrival_minute, duration_hours, duration_minutes,
             journey_day, journey_month
         )
