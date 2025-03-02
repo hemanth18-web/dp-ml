@@ -25,9 +25,9 @@ github_url = "https://raw.githubusercontent.com/hemanth18-web/dp-ml/refs/heads/m
 def load_data_from_github(url):
     response = requests.get(url)
     if response.status_code == 200:
-        with open("temp_data.xlsx", "wb") as f:
+        with open("temp_data.csv", "wb") as f:
             f.write(response.content)  # Save the file locally
-        data = pd.read_excel("temp_data.xlsx")  # Read the file with Pandas
+        data = pd.read_csv("temp_data.csv")  # Read the file with Pandas
         return data
     else:
         st.error("Failed to download the dataset from GitHub.")
