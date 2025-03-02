@@ -9,7 +9,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.feature_selection import mutual_info_regression
 from sklearn import metrics
 import warnings
-import requests
 
 warnings.filterwarnings("ignore")
 
@@ -17,27 +16,13 @@ warnings.filterwarnings("ignore")
 st.title("Flight Price Prediction App")
 st.write("This app allows you to preprocess flight data, train models, and predict flight prices.")
 
-# Function to fetch the file from GitHub using the API
-def fetch_file_from_github(repo, path, branch="main"):
-    url = f"https://api.github.com/repos/{repo}/contents/{path}?ref={branch}"
-    headers = {"Accept": "application/vnd.github.v3.raw"}
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        with open("temp_data.xlsx", "wb") as f:
-            f.write(response.content)  # Save the file locally
-        data = pd.read_excel("temp_data.xlsx")  # Read the file with Pandas
-        return data
-    else:
-        st.error("Failed to fetch the dataset from GitHub.")
-        return None
+# File uploader for dataset
+uploaded_file = st.file_uploader("Upload your dataset (Excel format)", type=["xlsx"])
 
-# Example usage
-repo = "hemanth18-web/dp-ml"  # Replace with your GitHub repo
-path = "Data_Train(1).xlsx"  # Path to the file in the repo
-data = fetch_file_from_github(repo, path)
-
-if data is not None:
-    st.success("Dataset loaded successfully from GitHub!")
+if uploaded_file is not None:
+    # Load the dataset
+    data = pd.read_excel(uploaded_file)
+    st.success("Dataset uploaded successfully!")
     st.write("### Dataset Preview:")
     st.dataframe(data.head())
 
@@ -118,22 +103,10 @@ if data is not None:
     rf_model.fit(X_train, y_train)
     dt_model.fit(X_train, y_train)
 
-    # Evaluate models
     rf_r2 = metrics.r2_score(y_test, rf_model.predict(X_test))
     dt_r2 = metrics.r2_score(y_test, dt_model.predict(X_test))
 
-    # Determine the best model
-    if rf_r2 > dt_r2:
-        best_model = rf_model
-        best_model_name = "Random Forest Regressor"
-    else:
-        best_model = dt_model
-        best_model_name = "Decision Tree Regressor"
-
-    # Display the best model
-    st.write("The best model is:", best_model_name)
-    st.write(f"Random Forest R2 Score: {rf_r2:.2f}")
-    st.write(f"Decision Tree R2 Score: {dt_r2:.2f}")
+    best_model = rf_model if rf_r2 > dt_r2 else dt_model
 
     # Prediction Function
     def predict_price(source, destination, stops, airline, dep_hour, dep_minute, arrival_hour, arrival_minute, duration_hours, duration_minutes, journey_day, journey_month):
@@ -204,4 +177,4 @@ if data is not None:
         st.success(f"The predicted price for the flight is: ₹{predicted_price:.2f}")
 
 else:
-    st.error("Failed to load the dataset from GitHub.")
+    st.warning("Please upload a dataset to proceed.")
