@@ -103,10 +103,22 @@ if uploaded_file is not None:
     rf_model.fit(X_train, y_train)
     dt_model.fit(X_train, y_train)
 
+    # Evaluate models
     rf_r2 = metrics.r2_score(y_test, rf_model.predict(X_test))
     dt_r2 = metrics.r2_score(y_test, dt_model.predict(X_test))
 
-    best_model = rf_model if rf_r2 > dt_r2 else dt_model
+    # Determine the best model
+    if rf_r2 > dt_r2:
+        best_model = rf_model
+        best_model_name = "Random Forest Regressor"
+    else:
+        best_model = dt_model
+        best_model_name = "Decision Tree Regressor"
+
+    # Display the best model
+    st.write("The best model is:", best_model_name)
+    st.write(f"Random Forest R2 Score: {rf_r2:.2f}")
+    st.write(f"Decision Tree R2 Score: {dt_r2:.2f}")
 
     # Prediction Function
     def predict_price(source, destination, stops, airline, dep_hour, dep_minute, arrival_hour, arrival_minute, duration_hours, duration_minutes, journey_day, journey_month):
