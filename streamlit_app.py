@@ -149,6 +149,48 @@ if data is not None:
     st.write(f"**Selected Model:** {best_model['model_name']}")
     st.write(f"**Training Score:** {best_model['training_score']:.2f}")
 
+    # Prediction Function
+    def predict_price(source, destination, stops, airline, dep_hour, dep_minute, arrival_hour, arrival_minute, duration_hours, duration_minutes, journey_day, journey_month):
+        """
+        Predict the flight price based on user input using the model with the highest training score.
+        """
+        # Map categorical inputs to their encoded values
+        source_mapping = {"Banglore": 0, "Delhi": 1, "Kolkata": 2, "Mumbai": 3, "Chennai": 4}
+        destination_mapping = {"Banglore": 0, "Delhi": 1, "Kolkata": 2, "Mumbai": 3, "Chennai": 4}
+
+        # Encode the inputs
+        source_encoded = source_mapping[source]
+        destination_encoded = destination_mapping[destination]
+
+        # Create a dictionary for the input data
+        input_data = {
+            "Source": source_encoded,
+            "Destination": destination_encoded,
+            "Total_Stops": stops,
+            "Airline": airline,
+            "Dep_Time_hour": dep_hour,
+            "Dep_Time_minute": dep_minute,
+            "Arrival_Time_hour": arrival_hour,
+            "Arrival_Time_minute": arrival_minute,
+            "Duration_hours": duration_hours,
+            "Duration_mins": duration_minutes,
+            "Journey_day": journey_day,
+            "Journey_month": journey_month
+        }
+
+        # Convert the input data to a DataFrame
+        input_df = pd.DataFrame([input_data])
+
+        # Align the input data with the training data (X_train)
+        for col in X.columns:
+            if col not in input_df.columns:
+                input_df[col] = 0  # Add missing columns with default value 0
+        input_df = input_df[X.columns]  # Reorder columns to match X_train
+
+        # Predict the price using the best model
+        predicted_price = best_model["model"].predict(input_df)[0]
+        return predicted_price
+
     # User Input for Prediction
     source = st.sidebar.selectbox("Source", ["Banglore", "Delhi", "Kolkata", "Mumbai", "Chennai"])
     destination = st.sidebar.selectbox("Destination", ["Banglore", "Delhi", "Kolkata", "Mumbai", "Chennai"])
@@ -167,7 +209,7 @@ if data is not None:
     stop_mapping = {'non-stop': 0, '1 stop': 1, '2 stops': 2, '3 stops': 3, '4 stops': 4}
     stops_mapped = stop_mapping[stops]
 
-    # Prediction
+    # Predict the price when the button is clicked
     if st.sidebar.button("Predict Price"):
         predicted_price = predict_price(
             source, destination, stops_mapped, airline, dep_hour, dep_minute,
