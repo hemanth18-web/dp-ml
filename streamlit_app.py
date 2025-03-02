@@ -18,7 +18,7 @@ st.title("Flight Price Prediction App")
 st.write("This app allows you to preprocess flight data, train models, and predict flight prices.")
 
 # Google Drive direct download link
-google_drive_url = "https://docs.google.com/spreadsheets/d/1eUYfbU9KqLYV13DiuvOLvyD6EU-OhxcA/edit?usp=sharing&ouid=116293298212948094112&rtpof=true&sd=true"  # Replace YOUR_FILE_ID with the actual file ID
+google_drive_url = "https://drive.google.com/uc?id=1eUYfbU9KqLYV13DiuvOLvyD6EU-OhxcA/edit?usp=sharing&ouid=116293298212948094112&rtpof=true&sd=true"  # Replace YOUR_FILE_ID with the actual file ID
 
 # Function to fetch the file from Google Drive
 @st.cache_resource
