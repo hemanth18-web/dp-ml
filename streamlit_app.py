@@ -118,65 +118,33 @@ if data is not None:
     rf_model.fit(X_train, y_train)
     dt_model.fit(X_train, y_train)
 
-    # Evaluate models
-    rf_r2 = metrics.r2_score(y_test, rf_model.predict(X_test))
-    dt_r2 = metrics.r2_score(y_test, dt_model.predict(X_test))
-
     # Calculate training scores
     rf_training_score = rf_model.score(X_train, y_train)
     dt_training_score = dt_model.score(X_train, y_train)
 
-    # Determine the best model
-    if rf_r2 > dt_r2:
+    # Select the best model based on the highest training score
+    if rf_training_score > dt_training_score:
         best_model = {
             "model_name": "Random Forest Regressor",
             "model": rf_model,
             "training_score": rf_training_score,
-            "y_prediction": rf_model.predict(X_test),
-            "r2_score": rf_r2,
-            "mae": metrics.mean_absolute_error(y_test, rf_model.predict(X_test)),
-            "mse": metrics.mean_squared_error(y_test, rf_model.predict(X_test)),
-            "rmse": np.sqrt(metrics.mean_squared_error(y_test, rf_model.predict(X_test))),
-            "mape": np.mean(np.abs((y_test - rf_model.predict(X_test)) / y_test)) * 100
         }
     else:
         best_model = {
             "model_name": "Decision Tree Regressor",
             "model": dt_model,
             "training_score": dt_training_score,
-            "y_prediction": dt_model.predict(X_test),
-            "r2_score": dt_r2,
-            "mae": metrics.mean_absolute_error(y_test, dt_model.predict(X_test)),
-            "mse": metrics.mean_squared_error(y_test, dt_model.predict(X_test)),
-            "rmse": np.sqrt(metrics.mean_squared_error(y_test, dt_model.predict(X_test))),
-            "mape": np.mean(np.abs((y_test - dt_model.predict(X_test)) / y_test)) * 100
         }
 
-    # Display the best model and its metrics
-    st.write("### Best Model Metrics")
-    st.write(f"**Best Model:** {best_model['model_name']}")
+    # Display the selected model
+    st.write("### Best Model (Based on Training Score)")
+    st.write(f"**Selected Model:** {best_model['model_name']}")
     st.write(f"**Training Score:** {best_model['training_score']:.2f}")
-    st.write(f"**R2 Score:** {best_model['r2_score']:.2f}")
-    st.write(f"**Mean Absolute Error (MAE):** {best_model['mae']:.2f}")
-    st.write(f"**Mean Squared Error (MSE):** {best_model['mse']:.2f}")
-    st.write(f"**Root Mean Squared Error (RMSE):** {best_model['rmse']:.2f}")
-    st.write(f"**Mean Absolute Percentage Error (MAPE):** {best_model['mape']:.2f}%")
-
-    # Print the metrics in the console (optional)
-    print(f"Best Model: {best_model['model_name']}")
-    print(f"Training Score: {best_model['training_score']}")
-    print(f"Predictions: {best_model['y_prediction']}")
-    print('\n')
-    print(f"R2 Score: {best_model['r2_score']}")
-    print(f"MAE: {best_model['mae']}")
-    print(f"MSE: {best_model['mse']}")
-    print(f"RMSE: {best_model['rmse']}")
-    print(f"MAPE: {best_model['mape']}")
 
     # Prediction Function
     def predict_price(source, destination, stops, airline, dep_hour, dep_minute, arrival_hour, arrival_minute, duration_hours, duration_minutes, journey_day, journey_month):
         """
-        Predict the flight price based on user input.
+        Predict the flight price based on user input using the model with the highest training score.
         """
         # Map categorical inputs to their encoded values
         source_mapping = {"Banglore": 0, "Delhi": 1, "Kolkata": 2, "Mumbai": 3, "Chennai": 4}
@@ -230,9 +198,11 @@ if data is not None:
     journey_day = st.number_input("Journey Day", min_value=1, max_value=31, value=15)
     journey_month = st.number_input("Journey Month", min_value=1, max_value=12, value=3)
 
+    # Map stops to numerical values
     stop_mapping = {'non-stop': 0, '1 stop': 1, '2 stops': 2, '3 stops': 3, '4 stops': 4}
     stops_mapped = stop_mapping[stops]
 
+    # Predict the price when the button is clicked
     if st.button("Predict Price"):
         predicted_price = predict_price(
             source, destination, stops_mapped, airline, dep_hour, dep_minute,
@@ -241,5 +211,5 @@ if data is not None:
         )
         st.success(f"The predicted price for the flight is: ₹{predicted_price:.2f}")
 
-else:
+else: 
     st.error("Failed to load the dataset from GitHub.")
