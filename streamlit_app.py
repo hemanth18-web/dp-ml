@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
+import requests
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.tree import DecisionTreeRegressor
 
@@ -11,7 +12,6 @@ with open(model_path, 'rb') as file:
     best_model = pickle.load(file)
 
 # Load the data and mappings
-# Assuming `dict_airlines` and other mappings are already created in your code
 dict_airlines = {
     'Jet Airways': 0,
     'IndiGo': 1,
@@ -27,6 +27,39 @@ dict_airlines = {
 }
 
 stop_mapping = {'non-stop': 0, '1 stop': 1, '2 stops': 2, '3 stops': 3, '4 stops': 4}
+
+# Provide the raw URL of the dataset from GitHub
+github_url = "https://raw.githubusercontent.com/hemanth18-web/dp-ml/main/Data_Train(1).xlsx"
+
+# Function to download the dataset from GitHub
+@st.cache_resource
+def load_data_from_github(url):
+    response = requests.get(url)
+    if response.status_code == 200:
+        with open("temp_data.xlsx", "wb") as f:
+            f.write(response.content)
+        data = pd.read_excel("temp_data.xlsx")
+        return data
+    else:
+        st.error("Failed to download the dataset from GitHub.")
+        return None
+
+# File uploader
+uploaded_file = st.file_uploader("Upload your dataset (Excel format)", type=["xlsx"])
+
+if uploaded_file is not None:
+    # If a file is uploaded, use it
+    data = pd.read_excel(uploaded_file)
+    st.success("Dataset uploaded successfully!")
+else:
+    # If no file is uploaded, use the default dataset from GitHub
+    st.warning("No file uploaded. Using default dataset from GitHub.")
+    data = load_data_from_github(github_url)
+
+# Display the dataset
+if data is not None:
+    st.write("Dataset Preview:")
+    st.dataframe(data.head())
 
 # Define the prediction function
 def predict_price_with_best_model(source, destination, stops, airline, dep_hour, dep_minute, arrival_hour, arrival_minute, duration_hours, duration_minutes, journey_day, journey_month):
@@ -52,14 +85,14 @@ def predict_price_with_best_model(source, destination, stops, airline, dep_hour,
     }
     
     # Add one-hot encoded columns for Source and Destination
-    for col in X.columns:  # `X` is the training data used for the model
+    for col in data.columns:  # `data` is the dataset used for the model
         if col.startswith("Source_"):
             input_data[col] = 1 if col == source_col else 0
         if col.startswith("Destination_"):
             input_data[col] = 1 if col == destination_col else 0
     
     # Ensure all features used during training are present in the input data
-    for col in X.columns:  # `X` is the training data used for the model
+    for col in data.columns:  # `data` is the dataset used for the model
         if col not in input_data:
             input_data[col] = 0  # Add missing features with a default value of 0
     
