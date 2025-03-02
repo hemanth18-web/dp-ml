@@ -43,73 +43,94 @@ def evaluate_model(ml_model, model_name, X_train, y_train, X_test, y_test):
 # Streamlit App
 st.title("Flight Price Prediction App")
 
-# Upload Dataset
+# Option to upload a dataset or use the default dataset from GitHub
+st.subheader("Upload Dataset or Use Default Dataset")
+
+# Provide the raw URL of the dataset from GitHub
+github_url = "https://raw.githubusercontent.com/username/repository-name/branch-name/Data_Train.xlsx"
+
+# File uploader
 uploaded_file = st.file_uploader("Upload your dataset (Excel format)", type=["xlsx"])
+
 if uploaded_file is not None:
+    # If a file is uploaded, use it
     data = pd.read_excel(uploaded_file)
-    st.write("Dataset Preview:")
-    st.dataframe(data.head())
+    st.success("Dataset uploaded successfully!")
+else:
+    # If no file is uploaded, use the default dataset from GitHub
+    st.warning("No file uploaded. Using default dataset from GitHub.")
+    @st.cache
+    def load_data():
+        data = pd.read_excel(github_url)
+        return data
+    data = load_data()
 
-    # Preprocessing
-    st.subheader("Data Preprocessing")
-    data.dropna(inplace=True)
-    data['Journey_day'] = pd.to_datetime(data['Date_of_Journey']).dt.day
-    data['Journey_month'] = pd.to_datetime(data['Date_of_Journey']).dt.month
-    data['Dep_Time_hour'] = pd.to_datetime(data['Dep_Time']).dt.hour
-    data['Dep_Time_minute'] = pd.to_datetime(data['Dep_Time']).dt.minute
-    data['Arrival_Time_hour'] = pd.to_datetime(data['Arrival_Time']).dt.hour
-    data['Arrival_Time_minute'] = pd.to_datetime(data['Arrival_Time']).dt.minute
-    data['Duration_total_mins'] = data['Duration'].str.replace('h', '*60').str.replace('m', '*1').str.replace(' ', '+').apply(eval)
-    data['Total_Stops'] = data['Total_Stops'].map({'non-stop': 0, '1 stop': 1, '2 stops': 2, '3 stops': 3, '4 stops': 4})
-    data['Destination'].replace('New Delhi', 'Delhi', inplace=True)
-    data.drop(columns=['Date_of_Journey', 'Route', 'Additional_Info', 'Duration', 'Source'], inplace=True)
+# Display the dataset
+st.write("Dataset Preview:")
+st.dataframe(data.head())
 
-    st.write("Processed Dataset:")
-    st.dataframe(data.head())
+# Preprocessing
+st.subheader("Data Preprocessing")
+data.dropna(inplace=True)
+data['Journey_day'] = pd.to_datetime(data['Date_of_Journey']).dt.day
+data['Journey_month'] = pd.to_datetime(data['Date_of_Journey']).dt.month
+data['Dep_Time_hour'] = pd.to_datetime(data['Dep_Time']).dt.hour
+data['Dep_Time_minute'] = pd.to_datetime(data['Dep_Time']).dt.minute
+data['Arrival_Time_hour'] = pd.to_datetime(data['Arrival_Time']).dt.hour
+data['Arrival_Time_minute'] = pd.to_datetime(data['Arrival_Time']).dt.minute
+data['Duration_total_mins'] = data['Duration'].str.replace('h', '*60').str.replace('m', '*1').str.replace(' ', '+').apply(eval)
+data['Total_Stops'] = data['Total_Stops'].map({'non-stop': 0, '1 stop': 1, '2 stops': 2, '3 stops': 3, '4 stops': 4})
+data['Destination'].replace('New Delhi', 'Delhi', inplace=True)
+data.drop(columns=['Date_of_Journey', 'Route', 'Additional_Info', 'Duration', 'Source'], inplace=True)
 
-    # Splitting Data
-    X = data.drop(['Price'], axis=1)
-    y = data['Price']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+st.write("Processed Dataset:")
+st.dataframe(data.head())
 
-    # Model Training
-    st.subheader("Model Training and Evaluation")
-    rf_model = RandomForestRegressor()
-    dt_model = DecisionTreeRegressor()
+# Feature Selection
+st.subheader("Feature Selection")
+all_features = list(data.columns)
+all_features.remove('Price')  # Remove the target column
+selected_features = st.multiselect("Select features for training:", all_features, default=all_features)
 
-    rf_results = evaluate_model(rf_model, "Random Forest Regressor", X_train, y_train, X_test, y_test)
-    dt_results = evaluate_model(dt_model, "Decision Tree Regressor", X_train, y_train, X_test, y_test)
+# Splitting Data
+X = data[selected_features]
+y = data['Price']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
 
-    # Display Results
-    st.write("Random Forest Results:")
-    st.json(rf_results)
+# Model Training
+st.subheader("Model Training and Evaluation")
 
-    st.write("Decision Tree Results:")
-    st.json(dt_results)
+# Random Forest Hyperparameters
+n_estimators = st.slider("Number of Trees (n_estimators):", min_value=10, max_value=500, value=100, step=10)
+max_depth = st.slider("Maximum Depth (max_depth):", min_value=1, max_value=50, value=10, step=1)
 
-    # Determine Best Model
-    if rf_results["training_score"] > dt_results["training_score"]:
-        best_model = rf_results
-    else:
-        best_model = dt_results
+# Models
+rf_model = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, random_state=42)
+dt_model = DecisionTreeRegressor()
 
-    st.write(f"Best Model: {best_model['model_name']}")
-    st.write(f"Training Score: {best_model['training_score']}")
-    st.write(f"R2 Score: {best_model['r2_score']}")
-    st.write(f"MAE: {best_model['mae']}")
-    st.write(f"MSE: {best_model['mse']}")
-    st.write(f"RMSE: {best_model['rmse']}")
-    st.write(f"MAPE: {best_model['mape']}")
+# Choose Model
+model_choice = st.selectbox("Select a model:", ["Random Forest", "Decision Tree"])
+if model_choice == "Random Forest":
+    model = rf_model
+else:
+    model = dt_model
 
-    # Plot Residuals
-    st.subheader("Residuals Plot")
-    fig, ax = plt.subplots()
-    sns.histplot(best_model["residuals"], kde=True, ax=ax)
-    st.pyplot(fig)
+# Evaluate Model
+results = evaluate_model(model, model_choice, X_train, y_train, X_test, y_test)
 
-    # Save Model
-    st.subheader("Save the Model")
-    if st.button("Save Random Forest Model"):
-        with open("rf_model.pkl", "wb") as f:
-            pickle.dump(rf_model, f)
-        st.success("Model saved as rf_model.pkl")
+# Display Results
+st.write(f"{model_choice} Results:")
+st.json(results)
+
+# Plot Residuals
+st.subheader("Residuals Plot")
+fig, ax = plt.subplots()
+sns.histplot(results["residuals"], kde=True, ax=ax)
+st.pyplot(fig)
+
+# Save Model
+st.subheader("Save the Model")
+if st.button("Save Model"):
+    with open(f"{model_choice.lower()}_model.pkl", "wb") as f:
+        pickle.dump(model, f)
+    st.success(f"Model saved as {model_choice.lower()}_model.pkl")
