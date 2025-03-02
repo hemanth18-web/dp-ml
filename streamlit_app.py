@@ -6,10 +6,7 @@ import requests
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.tree import DecisionTreeRegressor
 
-# Load the trained model
-model_path = r'C:\Users\hemanth.uppala\Desktop\Shaline/rf_random.pk1'
-with open(model_path, 'rb') as file:
-    best_model = pickle.load(file)
+
 
 # Load the data and mappings
 dict_airlines = {
