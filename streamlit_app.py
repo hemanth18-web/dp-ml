@@ -103,33 +103,34 @@ if uploaded_file is not None:
     rf_model.fit(X_train, y_train)
     dt_model.fit(X_train, y_train)
 
-    rf_train_score = rf_model.score(X_train, y_train)
-    dt_train_score = dt_model.score(X_train, y_train)
+    rf_r2 = metrics.r2_score(y_test, rf_model.predict(X_test))
+    dt_r2 = metrics.r2_score(y_test, dt_model.predict(X_test))
 
-    st.write(f"Random Forest Training Score: {rf_train_score:.2f}")
-    st.write(f"Decision Tree Training Score: {dt_train_score:.2f}")
-
-    # Model Evaluation
-    st.write("### Model Evaluation")
-    rf_y_pred = rf_model.predict(X_test)
-    dt_y_pred = dt_model.predict(X_test)
-
-    rf_r2 = metrics.r2_score(y_test, rf_y_pred)
-    dt_r2 = metrics.r2_score(y_test, dt_y_pred)
-
-    st.write(f"Random Forest R2 Score: {rf_r2:.2f}")
-    st.write(f"Decision Tree R2 Score: {dt_r2:.2f}")
-
-    # Select the best model
     best_model = rf_model if rf_r2 > dt_r2 else dt_model
-    st.write(f"Best Model: {'Random Forest' if rf_r2 > dt_r2 else 'Decision Tree'}")
 
-    # Prediction Function
-    def predict_price(source, destination, stops, airline, dep_hour, dep_minute, arrival_hour, arrival_minute, duration_hours, duration_minutes, journey_day, journey_month):
+    # User Input for Prediction
+    st.write("### Predict Flight Price")
+    source = st.selectbox("Source", ["Banglore", "Delhi", "Kolkata", "Mumbai", "Chennai"])
+    destination = st.selectbox("Destination", ["Banglore", "Delhi", "Kolkata", "Mumbai", "Chennai"])
+    stops = st.selectbox("Total Stops", ["non-stop", "1 stop", "2 stops", "3 stops", "4 stops"])
+    airline = st.selectbox("Airline", new_data['Airline'].unique())
+    dep_hour = st.slider("Departure Hour", 0, 23, 10)
+    dep_minute = st.slider("Departure Minute", 0, 59, 30)
+    arrival_hour = st.slider("Arrival Hour", 0, 23, 13)
+    arrival_minute = st.slider("Arrival Minute", 0, 59, 45)
+    duration_hours = st.number_input("Duration (Hours)", min_value=0, max_value=24, value=3)
+    duration_minutes = st.number_input("Duration (Minutes)", min_value=0, max_value=59, value=15)
+    journey_day = st.number_input("Journey Day", min_value=1, max_value=31, value=15)
+    journey_month = st.number_input("Journey Month", min_value=1, max_value=12, value=3)
+
+    stop_mapping = {'non-stop': 0, '1 stop': 1, '2 stops': 2, '3 stops': 3, '4 stops': 4}
+    stops_mapped = stop_mapping[stops]
+
+    if st.button("Predict Price"):
         input_data = {
             "Source": source,
             "Destination": destination,
-            "Total_Stops": stops,
+            "Total_Stops": stops_mapped,
             "Airline": airline,
             "Dep_Time_hour": dep_hour,
             "Dep_Time_minute": dep_minute,
@@ -141,25 +142,7 @@ if uploaded_file is not None:
             "Journey_month": journey_month
         }
         input_df = pd.DataFrame([input_data])
-        return best_model.predict(input_df)[0]
-
-    # User Input for Prediction
-    st.write("### Predict Flight Price")
-    source = st.selectbox("Source", new_data['Source'].unique())
-    destination = st.selectbox("Destination", new_data['Destination'].unique())
-    stops = st.selectbox("Total Stops", [0, 1, 2, 3, 4])
-    airline = st.selectbox("Airline", new_data['Airline'].unique())
-    dep_hour = st.slider("Departure Hour", 0, 23, 10)
-    dep_minute = st.slider("Departure Minute", 0, 59, 30)
-    arrival_hour = st.slider("Arrival Hour", 0, 23, 13)
-    arrival_minute = st.slider("Arrival Minute", 0, 59, 45)
-    duration_hours = st.number_input("Duration (Hours)", min_value=0, max_value=24, value=3)
-    duration_minutes = st.number_input("Duration (Minutes)", min_value=0, max_value=59, value=15)
-    journey_day = st.number_input("Journey Day", min_value=1, max_value=31, value=15)
-    journey_month = st.number_input("Journey Month", min_value=1, max_value=12, value=3)
-
-    if st.button("Predict Price"):
-        predicted_price = predict_price(source, destination, stops, airline, dep_hour, dep_minute, arrival_hour, arrival_minute, duration_hours, duration_minutes, journey_day, journey_month)
+        predicted_price = best_model.predict(input_df)[0]
         st.success(f"The predicted price for the flight is: ₹{predicted_price:.2f}")
 
 else:
