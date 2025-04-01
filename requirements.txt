@@ -5,4 +5,4 @@ seaborn
 matplotlib
 scikit-learn
 openpyxl
-pip install pandas openpyxl scikit-learn xgboost matplotlib seaborn
+xgboost 
