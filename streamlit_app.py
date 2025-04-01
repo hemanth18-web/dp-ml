@@ -152,7 +152,7 @@ def plot_feature_importance(model, features):
 
 # --- Streamlit App ---
 def main():
-    st.title("Flight Fare Prediction App")
+    st.title("Flight Fare Prediction App2")
 
     # File Upload
     file_path = st.file_uploader("Upload Flight Data (Excel file)", type=["xlsx"])
