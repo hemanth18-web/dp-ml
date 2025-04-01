@@ -1,228 +1,190 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.tree import DecisionTreeRegressor
+import seaborn as sns
+import pickle
 from sklearn.model_selection import train_test_split
-from sklearn.feature_selection import mutual_info_regression
-from sklearn import metrics
-import warnings
-import requests
+from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import RandomForestRegressor
+from xgboost import XGBRegressor
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
-warnings.filterwarnings("ignore")
-
-# Streamlit App Title
-st.set_page_config(page_title="Flight Price Prediction App", layout="wide")
-st.title("✈️ Flight Price Prediction App")
-st.write("This app allows you to preprocess flight data, train models, and predict flight prices.")
-
-# Sidebar for user inputs
-st.sidebar.header("User Input for Prediction")
-st.sidebar.write("Provide the details below to predict the flight price.")
-
-# GitHub URL for the dataset
-github_url = "https://raw.githubusercontent.com/hemanth18-web/dp-ml/refs/heads/main/Data_Train%20(1).csv"
-
-# Function to load the dataset from GitHub
-@st.cache_resource
-def load_data_from_github(url):
-    response = requests.get(url)
-    if response.status_code == 200:
-        with open("temp_data.csv", "wb") as f:
-            f.write(response.content)  # Save the file locally
-        data = pd.read_csv("temp_data.csv")  # Read the file with Pandas
+# --- Load Data ---
+@st.cache_data  # Cache the data to avoid reloading on every interaction
+def load_data(file_path):
+    try:
+        data = pd.read_excel(file_path, engine='openpyxl')
         return data
-    else:
-        st.error("Failed to download the dataset from GitHub.")
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
         return None
 
-# Load the dataset
-data = load_data_from_github(github_url)
+# --- Data Preprocessing ---
+def preprocess_data(data):
+    # Cabin Class (Random Assignment - Replace with actual logic if available)
+    cabin_classes = ['Economy', 'Business', 'First Class']
+    data['Cabin_Class'] = np.random.choice(cabin_classes, size=len(data))
 
-if data is not None:
-    st.success("✅ Dataset loaded successfully from GitHub!")
+    # Number of Stops and Flight Layover
+    def get_layover(route):
+        stops = route.count('→')
+        return stops, "Direct" if stops == 0 else f"{stops} Stop(s)"
 
-    # Dataset Preview
-    with st.expander("📊 Dataset Preview"):
-        st.write("### Raw Dataset:")
-        st.dataframe(data.head())
+    data[['Number_of_Stops', 'Flight_Layover']] = data['Route'].astype(str).apply(lambda x: pd.Series(get_layover(x)))
 
-    # Preprocessing
-    st.write("### 🔄 Preprocessing the Data")
-    st.write("Dropping missing values...")
-    data.dropna(inplace=True)
+    # Date Conversions
+    data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], format='%d/%m/%Y')
+    data['Booking_Date'] = data['Date_of_Journey'] - pd.to_timedelta(np.random.randint(1, 60, size=len(data)), unit='D')
+    data['Days_Until_Departure'] = (data['Date_of_Journey'] - data['Booking_Date']).dt.days
 
-    # Copy the data for processing
-    new_data = data.copy()
+    # Fuel Price (Random Generation - Replace with actual data if available)
+    fuel_price_data = pd.DataFrame({
+        'Date': pd.date_range(start='2019-01-01', periods=365, freq='D'),
+        'Fuel_Price_INR': np.random.uniform(60000, 90000, size=365)
+    })
+    fuel_price_data['Date'] = pd.to_datetime(fuel_price_data['Date'])
+    data = data.merge(fuel_price_data, left_on='Booking_Date', right_on='Date', how='left', suffixes=('', '_fuel'))
+    data.rename(columns={'Fuel_Price_INR': 'ATF_Price_INR'}, inplace=True)
+    data.drop(columns=['Date'], inplace=True)
 
-    # Convert columns to datetime
-    def change_into_datetime(col):
-        new_data[col] = pd.to_datetime(new_data[col])
+    # Extract Date Features
+    data['Day'] = data['Date_of_Journey'].dt.day
+    data['Month'] = data['Date_of_Journey'].dt.month
+    data['Year'] = data['Date_of_Journey'].dt.year
 
-    for feature in ['Date_of_Journey', 'Dep_Time', 'Arrival_Time']:
-        change_into_datetime(feature)
+    # Extract Time Features
+    data['Dep_Time'] = pd.to_datetime(data['Dep_Time'])
+    data['Dep_Hour'] = data['Dep_Time'].dt.hour
+    data['Dep_Minute'] = data['Dep_Time'].dt.minute
 
-    # Extract day, month, and year
-    new_data["Journey_day"] = new_data['Date_of_Journey'].dt.day
-    new_data["Journey_month"] = new_data['Date_of_Journey'].dt.month
+    data['Arrival_Time'] = pd.to_datetime(data['Arrival_Time'])
+    data['Arrival_Hour'] = data['Arrival_Time'].dt.hour
+    data['Arrival_Minute'] = data['Arrival_Time'].dt.minute
 
-    # Extract hour and minute
-    def extract_hour_min(df, col):
-        df[col + "_hour"] = df[col].dt.hour
-        df[col + "_minute"] = df[col].dt.minute
-
-    extract_hour_min(new_data, "Dep_Time")
-    extract_hour_min(new_data, "Arrival_Time")
-
-    # Drop unnecessary columns
-    new_data.drop(['Date_of_Journey', 'Dep_Time', 'Arrival_Time'], axis=1, inplace=True)
-
-    # Process duration
-    def process_duration(x):
+    # Duration
+    def preprocess_duration(x):
         if 'h' not in x:
             x = '0h ' + x
         elif 'm' not in x:
             x = x + ' 0m'
         return x
 
-    new_data['Duration'] = new_data['Duration'].apply(process_duration)
-    new_data['Duration_hours'] = new_data['Duration'].apply(lambda x: int(x.split(' ')[0][:-1]))
-    new_data['Duration_mins'] = new_data['Duration'].apply(lambda x: int(x.split(' ')[1][:-1]))
-    new_data.drop(['Duration'], axis=1, inplace=True)
+    data['Duration'] = data['Duration'].astype(str).apply(preprocess_duration)
+    data['Duration_hours'] = data['Duration'].str.split(' ').str[0].str.replace('h', '').astype(int)
+    data['Duration_minutes'] = data['Duration'].str.split(' ').str[1].str.replace('m', '').astype(int)
+    data['Duration_total_mins'] = data['Duration'].str.replace('h', "*60").str.replace(' ', '+').str.replace('m', "*1").apply(eval)
 
-    # Encode categorical columns
-    new_data['Airline'] = new_data['Airline'].astype('category').cat.codes
-    new_data['Source'] = new_data['Source'].astype('category').cat.codes
-    new_data['Destination'] = new_data['Destination'].astype('category').cat.codes
-    new_data['Total_Stops'] = new_data['Total_Stops'].map({'non-stop': 0, '1 stop': 1, '2 stops': 2, '3 stops': 3, '4 stops': 4})
+    # Categorical Encoding
+    airlines = data.groupby(['Airline'])['Price'].mean().sort_values().index
+    dict_airlines = {key: index for index, key in enumerate(airlines, 0)}
+    data['Airline'] = data['Airline'].map(dict_airlines)
 
-    # Drop unnecessary columns
-    new_data.drop(['Route', 'Additional_Info'], axis=1, inplace=True)
+    data['Destination'] = data['Destination'].replace('New Delhi', 'Delhi')
+    destination = data.groupby(['Destination'])['Price'].mean().sort_values().index
+    dict_destination = {key: index for index, key in enumerate(destination, 0)}
+    data['Destination'] = data['Destination'].map(dict_destination)
 
-    with st.expander("🔍 Processed Data Preview"):
-        st.write("### Processed Data:")
-        st.dataframe(new_data.head())
+    Total_Stops = data['Total_Stops'].unique()
+    dict_Total_Stops = {key: index for index, key in enumerate(Total_Stops, 0)}
+    data['Total_Stops'] = data['Total_Stops'].map(dict_Total_Stops)
 
-    # Feature Selection
-    st.write("### 📈 Feature Importance")
-    X = new_data.drop(['Price'], axis=1)
-    y = new_data['Price']
-    imp = mutual_info_regression(X, y)
-    imp_df = pd.DataFrame(imp, index=X.columns, columns=['Importance']).sort_values(by='Importance', ascending=False)
-    st.bar_chart(imp_df)
+    Cabin_Class = data['Cabin_Class'].unique()
+    dict_Cabin_Class = {key: index for index, key in enumerate(Cabin_Class, 0)}
+    data['Cabin_Class'] = data['Cabin_Class'].map(dict_Cabin_Class)
 
-    # Train-Test Split
-    st.write("### ✂️ Train-Test Split")
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
-    st.write(f"Training Data: {X_train.shape}, Testing Data: {X_test.shape}")
+    # Drop Unnecessary Columns
+    cols_to_drop = ['Date_of_Journey', 'Dep_Time', 'Arrival_Time', 'Additional_Info', 'Source', 'Route', 'Duration', 'Flight_Layover']
+    data.drop(columns=cols_to_drop, axis=1, inplace=True)
 
-    # Model Training
-    st.write("### 🤖 Model Training")
-    rf_model = RandomForestRegressor()
-    dt_model = DecisionTreeRegressor()
-    st.write("RandomForestRegressor")
-    st.write("DecisionTreeRegressor")
+    return data
 
-    rf_model.fit(X_train, y_train)
-    dt_model.fit(X_train, y_train)
+# --- Model Training and Prediction ---
+def train_and_predict(data, model_name):
+    X = data.drop(['Price'], axis=1)
+    y = data['Price']
 
-    # Calculate training scores
-    rf_training_score = rf_model.score(X_train, y_train)
-    dt_training_score = dt_model.score(X_train, y_train)
+    # Convert 'Booking_Date' to ordinal
+    X['Booking_Date'] = pd.to_datetime(X['Booking_Date']).apply(lambda date: date.toordinal())
 
-    # Select the best model based on the highest training score
-    if rf_training_score > dt_training_score:
-        best_model = {
-            "model_name": "Random Forest Regressor",
-            "model": rf_model,
-            "training_score": rf_training_score,
-        }
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=100)
+
+    models = {
+        "Linear Regression": LinearRegression(),
+        "Decision Tree": DecisionTreeRegressor(),
+        "Random Forest": RandomForestRegressor(),
+        "XGBoost": XGBRegressor(),
+        "Gradient Boosting": GradientBoostingRegressor()
+    }
+
+    model = models[model_name]
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+
+    r2 = r2_score(y_test, y_pred)
+    mae = mean_absolute_error(y_test, y_pred)
+    mse = mean_squared_error(y_test, y_pred)
+    rmse = np.sqrt(mse)
+    mape = np.mean(np.abs((y_test - y_pred) / y_test)) * 100
+
+    return r2, mae, mse, rmse, mape, model
+
+# --- Visualization Functions ---
+def plot_price_distribution(data):
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.histplot(data['Price'], kde=True, ax=ax)
+    ax.set_title('Price Distribution')
+    st.pyplot(fig)
+
+def plot_feature_importance(model, features):
+    if hasattr(model, 'feature_importances_'):
+        fig, ax = plt.subplots(figsize=(8, 6))
+        importances = pd.Series(model.feature_importances_, index=features.columns)
+        importances.sort_values().plot(kind='barh', ax=ax)
+        ax.set_title('Feature Importance')
+        st.pyplot(fig)
     else:
-        best_model = {
-            "model_name": "Decision Tree Regressor",
-            "model": dt_model,
-            "training_score": dt_training_score,
-        }
+        st.write("Feature importance not available for this model.")
 
-    # Display the selected model
-    st.write("### 🏆 Best Model (Based on Training Score)")
-    st.write(f"**Selected Model:** {best_model['model_name']}")
-    st.write(f"**Training Score:** {best_model['training_score']:.2f}")
+# --- Streamlit App ---
+def main():
+    st.title("Flight Fare Prediction App")
 
-    # Prediction Function
-    def predict_price(source, destination, stops, airline, dep_hour, dep_minute, arrival_hour, arrival_minute, duration_hours, duration_minutes, journey_day, journey_month):
-        """
-        Predict the flight price based on user input using the model with the highest training score.
-        """
-        # Map categorical inputs to their encoded values
-        source_mapping = {"Banglore": 0, "Delhi": 1, "Kolkata": 2, "Mumbai": 3, "Chennai": 4}
-        destination_mapping = {"Banglore": 0, "Delhi": 1, "Kolkata": 2, "Mumbai": 3, "Chennai": 4}
+    # File Upload
+    file_path = st.file_uploader("Upload Flight Data (Excel file)", type=["xlsx"])
 
-        # Encode the inputs
-        source_encoded = source_mapping[source]
-        destination_encoded = destination_mapping[destination]
+    if file_path is not None:
+        data = load_data(file_path)
 
-        # Create a dictionary for the input data
-        input_data = {
-            "Source": source_encoded,
-            "Destination": destination_encoded,
-            "Total_Stops": stops,
-            "Airline": airline,
-            "Dep_Time_hour": dep_hour,
-            "Dep_Time_minute": dep_minute,
-            "Arrival_Time_hour": arrival_hour,
-            "Arrival_Time_minute": arrival_minute,
-            "Duration_hours": duration_hours,
-            "Duration_mins": duration_minutes,
-            "Journey_day": journey_day,
-            "Journey_month": journey_month
-        }
+        if data is not None:
+            st.subheader("Data Preview")
+            st.dataframe(data.head())
 
-        # Convert the input data to a DataFrame
-        input_df = pd.DataFrame([input_data])
+            # Preprocess Data
+            data = preprocess_data(data.copy())  # Use a copy to avoid modifying the original
 
-        # Align the input data with the training data (X_train)
-        for col in X.columns:
-            if col not in input_df.columns:
-                input_df[col] = 0  # Add missing columns with default value 0
-        input_df = input_df[X.columns]  # Reorder columns to match X_train
+            # Model Selection
+            model_name = st.selectbox("Select a Model", [
+                "Linear Regression", "Decision Tree", "Random Forest", "XGBoost", "Gradient Boosting"
+            ])
 
-        # Predict the price using the best model
-        predicted_price = best_model["model"].predict(input_df)[0]
-        return predicted_price
+            if st.button("Train and Predict"):
+                with st.spinner(f"Training {model_name}..."):
+                    r2, mae, mse, rmse, mape, model = train_and_predict(data, model_name)
 
-    # User Input for Prediction
-    source = st.sidebar.selectbox("Source", ["Banglore", "Delhi", "Kolkata", "Mumbai", "Chennai"])
-    destination = st.sidebar.selectbox("Destination", ["Banglore", "Delhi", "Kolkata", "Mumbai", "Chennai"])
-    stops = st.sidebar.selectbox("Total Stops", ["non-stop", "1 stop", "2 stops", "3 stops", "4 stops"])
-    airline = st.sidebar.selectbox("Airline", list(data['Airline'].unique()))
-    dep_hour = st.sidebar.slider("Departure Hour", 0, 23, 10)
-    dep_minute = st.sidebar.slider("Departure Minute", 0, 59, 30)
-    arrival_hour = st.sidebar.slider("Arrival Hour", 0, 23, 13)
-    arrival_minute = st.sidebar.slider("Arrival Minute", 0, 59, 45)
-    duration_hours = st.sidebar.number_input("Duration (Hours)", min_value=0, max_value=24, value=3)
-    duration_minutes = st.sidebar.number_input("Duration (Minutes)", min_value=0, max_value=59, value=15)
-    journey_day = st.sidebar.number_input("Journey Day", min_value=1, max_value=31, value=15)
-    journey_month = st.sidebar.number_input("Journey Month", min_value=1, max_value=12, value=3)
+                st.subheader("Model Performance")
+                st.write(f"R² Score: {r2:.4f}")
+                st.write(f"Mean Absolute Error: {mae:.2f}")
+                st.write(f"Mean Squared Error: {mse:.2f}")
+                st.write(f"Root Mean Squared Error: {rmse:.2f}")
+                st.write(f"Mean Absolute Percentage Error: {mape:.2f}%")
 
-    # Map stops to numerical values
-    stop_mapping = {'non-stop': 0, '1 stop': 1, '2 stops': 2, '3 stops': 3, '4 stops': 4}
-    stops_mapped = stop_mapping[stops]
+                # Visualizations
+                st.subheader("Visualizations")
+                plot_price_distribution(data)
+                plot_feature_importance(model, data.drop(['Price'], axis=1))
 
-    # Encode the selected airline name to its numerical value
-    airline_mapping = dict(enumerate(data['Airline'].astype('category').cat.categories))
-    airline_encoded = {v: k for k, v in airline_mapping.items()}[airline]
-
-    # Predict the price when the button is clicked
-    if st.sidebar.button("Predict Price"):
-        predicted_price = predict_price(
-            source, destination, stops_mapped, airline_encoded, dep_hour, dep_minute,
-            arrival_hour, arrival_minute, duration_hours, duration_minutes,
-            journey_day, journey_month
-        )
-        st.sidebar.success(f"The predicted price for the flight is: ₹{predicted_price:.2f}")
-
-else:
-    st.error("Failed to load the dataset from GitHub.")
+if __name__ == "__main__":
+    main()
