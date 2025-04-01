@@ -12,6 +12,8 @@ from xgboost import XGBRegressor
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
+
+st.title("✈️ Flight Price Prediction good")
 # --- Load Data ---
 @st.cache_data  # Cache the data to avoid reloading on every interaction
 def load_data(file_path):
