@@ -63,6 +63,8 @@ st.markdown("""
 
 st.title("✈️ Flight Fare Prediction App")
 
+y_pred = None  # Initialize y_pred to None
+
 if data is not None:
     # --- Data Cleaning and Conversion ---
 
@@ -196,26 +198,29 @@ if data is not None:
     random_forest_model = RandomForestRegressor(n_estimators=100, random_state=42)
     random_forest_model.fit(X_train, y_train)
 
-    y_pred = random_forest_model.predict(X_test)  # Move this line here
+    y_pred = random_forest_model.predict(X_test)  # Calculate y_pred
 
     # --- Model Evaluation ---
-    st.header("Model Evaluation")
-    col1, col2 = st.columns(2)
-    with col1:
-        mse = mean_squared_error(y_test, y_pred)
-        st.metric("Mean Squared Error", f"{mse:.2f}")
-    with col2:
-        r2 = r2_score(y_test, y_pred)
-        st.metric("R^2 Score", f"{r2:.2f}")
+    if y_pred is not None:  # Check if y_pred was successfully calculated
+        st.header("Model Evaluation")
+        col1, col2 = st.columns(2)
+        with col1:
+            mse = mean_squared_error(y_test, y_pred)
+            st.metric("Mean Squared Error", f"{mse:.2f}")
+        with col2:
+            r2 = r2_score(y_test, y_pred)
+            st.metric("R^2 Score", f"{r2:.2f}")
 
-    # --- Feature Importance Plot ---
-    st.subheader("Feature Importance")
-    feature_importance = pd.Series(random_forest_model.feature_importances_, index=X.columns).sort_values(ascending=False)
-    fig_feature_importance, ax_feature_importance = plt.subplots(figsize=(10, 6))
-    feature_importance.plot(kind='bar', ax=ax_feature_importance)
-    ax_feature_importance.set_title("Feature Importance from Random Forest")
-    ax_feature_importance.set_ylabel("Importance Score")
-    st.pyplot(fig_feature_importance)
+        # --- Feature Importance Plot ---
+        st.subheader("Feature Importance")
+        feature_importance = pd.Series(random_forest_model.feature_importances_, index=X.columns).sort_values(ascending=False)
+        fig_feature_importance, ax_feature_importance = plt.subplots(figsize=(10, 6))
+        feature_importance.plot(kind='bar', ax=ax_feature_importance)
+        ax_feature_importance.set_title("Feature Importance from Random Forest")
+        ax_feature_importance.set_ylabel("Importance Score")
+        st.pyplot(fig_feature_importance)
+    else:
+        st.write("Model evaluation could not be performed because the data failed to load.")
 
     # --- Prediction Interface ---
     st.sidebar.header("Flight Details for Prediction")
