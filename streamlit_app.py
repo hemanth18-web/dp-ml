@@ -4,9 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import requests
-import io  # Import the io module
+import io
 
-# --- LOAD DATA ---
 # GitHub URL for the dataset
 github_url = "https://raw.githubusercontent.com/hemanth18-web/dp-ml/refs/heads/main/Updated_Flight_Fare_Data%20(20).csv"
 
@@ -15,14 +14,9 @@ github_url = "https://raw.githubusercontent.com/hemanth18-web/dp-ml/refs/heads/m
 def load_data_from_github(url):
     try:
         response = requests.get(url)
-        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
-        csv_data = response.content.decode('utf-8')  # Decode the content to string
-        data = pd.read_csv(io.StringIO(csv_data))  # Read the CSV data directly from the string
-
-        # --- ADDED: Save the data to CSV ---
-        data.to_csv('updated_file.csv', index=False)
-        st.success("Data saved to updated_file.csv")
-
+        response.raise_for_status()
+        csv_data = response.content.decode('utf-8')
+        data = pd.read_csv(io.StringIO(csv_data))
         return data
     except requests.exceptions.RequestException as e:
         st.error(f"Failed to download the dataset from GitHub: {e}")
@@ -38,9 +32,15 @@ def load_data_from_github(url):
 data = load_data_from_github(github_url)
 
 # --- STREAMLIT APP ---
-st.title("Flight Fare Data Exploration")
+st.title("Flight Fare Data Exploration2")
 
-if data is not None:  # Only proceed if data loading was successful
+if data is not None:
+    # --- Data Cleaning and Conversion ---
+    # Handle missing values and convert 'Total_Stops' to numeric
+    data['Total_Stops'] = data['Total_Stops'].replace('NaN', np.nan)  # Replace string 'NaN' with actual NaN
+    data['Total_Stops'] = data['Total_Stops'].fillna(0)  # Fill NaN with 0 (or another appropriate value)
+    data['Total_Stops'] = pd.to_numeric(data['Total_Stops'])  # Convert to numeric
+
     st.header("Data Preview")
     st.dataframe(data.head())
 
@@ -98,7 +98,6 @@ if data is not None:  # Only proceed if data loading was successful
         sns.countplot(x="Airline", data=filtered_data, ax=ax_airline_filtered, palette="muted", order=filtered_data['Airline'].value_counts().index)  # Order by frequency
         ax_airline_filtered.tick_params(axis='x', rotation=90)
         st.pyplot(fig_airline_filtered)
-
     else:
         filtered_data = data  # Use original data if no filter is applied
 
@@ -109,7 +108,6 @@ if data is not None:  # Only proceed if data loading was successful
 
     # Apply Price Range Filter
     filtered_data = filtered_data[(filtered_data["Price"] >= price_range[0]) & (filtered_data["Price"] <= price_range[1])]
-
     st.subheader("Data (Price Range Filtered)")
     st.dataframe(filtered_data)
 
