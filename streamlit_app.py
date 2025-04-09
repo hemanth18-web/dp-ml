@@ -38,7 +38,7 @@ def load_data_from_github(url):
 data = load_data_from_github(github_url)
 
 # --- STREAMLIT APP ---
-st.title("Flight Fare Data Exploration3")
+st.title("Flight Fare Data Exploration33")
 
 if data is not None:  # Only proceed if data loading was successful
     st.header("Data Preview")
