@@ -130,6 +130,16 @@ if data is not None:
     # **Handle Flight_Layover Column**
     data['Flight_Layover'] = data['Flight_Layover'].astype('category').cat.codes
 
+    # **Handle Booking_Date Column**
+    try:
+        data['Booking_Date'] = pd.to_datetime(data['Booking_Date'], errors='coerce')
+        data['Booking_Day'] = data['Booking_Date'].dt.day
+        data['Booking_Month'] = data['Booking_Date'].dt.month
+        data['Booking_Year'] = data['Booking_Date'].dt.year  # Extract year as well
+        data.drop('Booking_Date', axis=1, inplace=True, errors='ignore')
+    except Exception as e:
+        st.error(f"Error processing 'Booking_Date' column: {e}")
+
     # --- Feature Engineering and Encoding ---
 
     # Convert categorical features to numerical
