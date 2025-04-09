@@ -188,10 +188,6 @@ if data is not None:
     X = data.drop(['Price'], axis=1, errors='ignore') # Ignore if 'Price' is already dropped
     y = data['Price']
 
-    # Check data types of X
-    st.write("Data types of X before train_test_split:")
-    st.write(X.dtypes)
-
     # Convert object columns to numeric (if possible) or categorical
     for col in X.columns:
         if X[col].dtype == 'object':
@@ -201,21 +197,12 @@ if data is not None:
                 st.warning(f"Column '{col}' could not be converted to numeric. Treating as categorical.")
                 X[col] = X[col].astype('category').cat.codes
 
-    st.write(f"Shape of X: {X.shape}")  # Debugging statement
-    st.write(f"Shape of y: {y.shape}")  # Debugging statement
-
     if X is not None and y is not None and not X.empty and not y.empty:
-        st.write("X and y are not None and not empty!")  # Debugging statement
 
         # Split data into training and testing sets
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        # Check data types of X_train
-        st.write("Data types of X_train after train_test_split:")
-        st.write(X_train.dtypes)
-
         if X_train is not None and not X_train.empty:
-            st.write("X_train is not None and not empty!")  # Debugging statement
 
             # --- Model Training ---
             st.header("Random Forest Model Training")
@@ -223,7 +210,6 @@ if data is not None:
             random_forest_model.fit(X_train, y_train)
 
             y_pred = random_forest_model.predict(X_test)  # Calculate y_pred
-            st.write("Model prediction successful!") # Debugging statement
         else:
             st.error("X_train is None or empty. Model training cannot be performed.")
     else:
@@ -381,9 +367,9 @@ if data is not None:
                 days_count = data['Days_Until_Departure'].value_counts().sort_index()
                 fig_days_line, ax_days_line = plt.subplots(figsize=(10, 6))
                 ax_days_line.plot(days_count.index, days_count.values, marker='o', color='skyblue', linewidth=2)
-                ax_days_line.set_title('Days Until Departure (Line Plot)', fontsize=12, fontweight='bold')
-                ax_days_line.set_xlabel('Days Until Departure', fontsize=12)
-                ax_days_line.set_ylabel('Count', fontsize=12)
+                ax_lineplot.set_title('Days Until Departure', fontsize=14, fontweight='bold')
+                ax_lineplot.set_xlabel('Days Until Departure', fontsize=12)
+                ax_lineplot.set_ylabel('Count', fontsize=12)
                 fig_days_line.tight_layout()
                 st.pyplot(fig_days_line)
 
