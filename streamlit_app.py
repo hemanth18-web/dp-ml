@@ -48,11 +48,11 @@ if data is not None:
     data['Total_Stops'] = data['Total_Stops'].replace('NaN', np.nan)  # Replace string 'NaN' with actual NaN
     data['Total_Stops'] = data['Total_Stops'].fillna(0)  # Fill NaN with 0 (or another appropriate value)
 
-    # **Correctly Handle Non-Numeric Values**
+    # **Correctly Handle Non-Numeric Values in Total_Stops**
     def convert_stops_to_numeric(stops):
         if isinstance(stops, (int, float)):  # Check if already numeric
             return stops
-        elif '→' in stops:
+        elif isinstance(stops, str) and '→' in stops:
             return len(stops.split('→'))  # Count the number of stops based on '→'
         else:
             return 0  # Default to 0 for unknown values
@@ -61,6 +61,21 @@ if data is not None:
 
     # Convert 'Total_Stops' to numeric *after* cleaning
     data['Total_Stops'] = pd.to_numeric(data['Total_Stops'], errors='coerce').fillna(0)
+
+    # **Handle Dep_Time Column**
+    try:
+        # Attempt to convert 'Dep_Time' to datetime objects
+        data['Dep_Time'] = pd.to_datetime(data['Dep_Time'], errors='coerce')
+
+        # Extract hour and minute
+        data['Dep_Time_hour'] = data['Dep_Time'].dt.hour
+        data['Dep_Time_minute'] = data['Dep_Time'].dt.minute
+
+        # Drop the original 'Dep_Time' column
+        data.drop('Dep_Time', axis=1, inplace=True, errors='ignore')  # Use errors='ignore'
+
+    except Exception as e:
+        st.error(f"Error processing 'Dep_Time' column: {e}")
 
     # --- Feature Engineering and Encoding ---
 
