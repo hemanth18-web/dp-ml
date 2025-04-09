@@ -32,7 +32,7 @@ def load_data_from_github(url):
 data = load_data_from_github(github_url)
 
 # --- STREAMLIT APP ---
-st.title("Flight Fare Data Exploration2")
+st.title("Flight Fare Data Exploration3")
 
 if data is not None:
     # --- Data Cleaning and Conversion ---
@@ -117,6 +117,65 @@ if data is not None:
     ax_countplot.tick_params(axis='x', rotation=90, labelsize=8)
     fig_countplot.tight_layout()
     st.pyplot(fig_countplot)
+
+    # Create the line plot
+    st.subheader("Ticket Price Trends Over Time")
+    fig_lineplot, ax_lineplot = plt.subplots(figsize=(10, 6))
+    sns.lineplot(x="Date_of_Journey", y="Price", data=data, hue="Airline", marker="o", palette="viridis", ax=ax_lineplot)  # Changed x to "Date_of_Journey" and y to "Price"
+    ax_lineplot.set_title("Ticket Price Trends Over Time", fontsize=14, fontweight="bold")
+    ax_lineplot.set_xlabel("Date", fontsize=12)
+    ax_lineplot.set_ylabel("Price (₹) ", fontsize=12)
+    ax_lineplot.tick_params(axis='x', rotation=90)
+    fig_lineplot.tight_layout()
+    st.pyplot(fig_lineplot)
+
+    # Assuming 'Days_Until_Departure' is in your data, we first calculate the frequency of each unique value
+    st.subheader("Days Until Departure (Line Plot)")
+    days_count = data['Days_Until_Departure'].value_counts().sort_index()
+    fig_days_line, ax_days_line = plt.subplots(figsize=(10, 6))
+    ax_days_line.plot(days_count.index, days_count.values, marker='o', color='skyblue', linewidth=2)
+    ax_days_line.set_title('Days Until Departure (Line Plot)', fontsize=12, fontweight='bold')
+    ax_days_line.set_xlabel('Days Until Departure', fontsize=12)
+    ax_days_line.set_ylabel('Count', fontsize=12)
+    fig_days_line.tight_layout()
+    st.pyplot(fig_days_line)
+
+    # Set style
+    st.subheader("Price Distribution by Cabin Class (Customized)")
+    sns.set(style="whitegrid")
+    fig_boxplot_cabin, ax_boxplot_cabin = plt.subplots(figsize=(10, 8))
+    sns.boxplot(x="Cabin_Class", y="Price", data=data, palette="Set1", hue="Airline", ax=ax_boxplot_cabin)
+    ax_boxplot_cabin.set_title("Price Distribution by Cabin Class (Customized)", fontsize=14, fontweight='bold')
+    ax_boxplot_cabin.set_xlabel("Cabin Class", fontsize=12)
+    ax_boxplot_cabin.set_ylabel("Price ()", fontsize=12)
+    ax_boxplot_cabin.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
+    fig_boxplot_cabin.tight_layout()
+    st.pyplot(fig_boxplot_cabin)
+
+    # Set style for a clean, modern look
+    st.subheader("Price Distribution by Cabin Class")
+    sns.set(style="whitegrid")
+    fig_boxplot_cabin2, ax_boxplot_cabin2 = plt.subplots(figsize=(10, 6))
+    sns.boxplot(x="Cabin_Class", y="Price", data=data, palette="Set2", hue="Cabin_Class", ax=ax_boxplot_cabin2)
+    ax_boxplot_cabin2.set_title("Price Distribution by Cabin Class ", fontsize=14, fontweight='bold', color="#2c3e50")
+    ax_boxplot_cabin2.set_xlabel("Cabin Class", fontsize=12)
+    ax_boxplot_cabin2.set_ylabel("Price ($)", fontsize=12)
+    ax_boxplot_cabin2.grid(True, which='both', linestyle='--', linewidth=0.7, alpha=0.6)
+    fig_boxplot_cabin2.tight_layout()
+    st.pyplot(fig_boxplot_cabin2)
+
+    # Set style for a clean, modern look
+    st.subheader("Price Distribution by Airline")
+    sns.set(style="whitegrid")
+    fig_boxplot_airline, ax_boxplot_airline = plt.subplots(figsize=(10, 6))
+    sns.boxplot(x="Airline", y="Price", data=data.sort_values('Price', ascending=False), hue="Airline", palette="Set2", ax=ax_boxplot_airline)
+    ax_boxplot_airline.set_title(" Price Distribution by Airline", fontsize=14, fontweight='bold', color="#2c3e50")
+    ax_boxplot_airline.set_xlabel("Airline ", fontsize=12)
+    ax_boxplot_airline.set_ylabel("Price", fontsize=12)
+    ax_boxplot_airline.tick_params(axis='x', rotation=90)
+    ax_boxplot_airline.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
+    fig_boxplot_airline.tight_layout()
+    st.pyplot(fig_boxplot_airline)
 
 else:
     st.write("Failed to load data.  Check the GitHub URL and your internet connection.")
