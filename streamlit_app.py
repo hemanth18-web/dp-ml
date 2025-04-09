@@ -70,14 +70,105 @@ if data is not None:
     st.write("Data loaded successfully!")  # Debugging statement
 
     # --- Data Cleaning and Conversion ---
-    # ... (Data cleaning and conversion code) ...
+    # Replace "non-stop" with 0
+    data['Total_Stops'] = data['Total_Stops'].replace("non-stop", 0)
+
+    # Handle missing values (NaN)
+    data['Total_Stops'] = data['Total_Stops'].replace('NaN', np.nan)  # Replace string 'NaN' with actual NaN
+    data['Total_Stops'] = data['Total_Stops'].fillna(0)  # Fill NaN with 0 (or another appropriate value)
+
+    # **Correctly Handle Non-Numeric Values in Total_Stops**
+    def convert_stops_to_numeric(stops):
+        if isinstance(stops, (int, float)):  # Check if already numeric
+            return stops
+        elif isinstance(stops, str) and '→' in stops:
+            return len(stops.split('→'))  # Count the number of stops based on '→'
+        else:
+            return 0  # Default to 0 for unknown values
+
+    data['Total_Stops'] = data['Total_Stops'].astype(str).apply(convert_stops_to_numeric) # Convert to string first to handle mixed types
+
+    # Convert 'Total_Stops' to numeric *after* cleaning
+    data['Total_Stops'] = pd.to_numeric(data['Total_Stops'], errors='coerce').fillna(0)
+
+    # **Handle Dep_Time Column**
+    try:
+        # Attempt to convert 'Dep_Time' to datetime objects
+        data['Dep_Time'] = pd.to_datetime(data['Dep_Time'], errors='coerce')
+
+        # Extract hour and minute
+        data['Dep_Time_hour'] = data['Dep_Time'].dt.hour
+        data['Dep_Time_minute'] = data['Dep_Time'].dt.minute
+
+        # Drop the original 'Dep_Time' column
+        data.drop('Dep_Time', axis=1, inplace=True, errors='ignore')  # Use errors='ignore'
+
+    except Exception as e:
+        st.error(f"Error processing 'Dep_Time' column: {e}")
+
+    # **Handle Arrival_Time Column**
+    try:
+        # Attempt to convert 'Arrival_Time' to datetime objects
+        data['Arrival_Time'] = pd.to_datetime(data['Arrival_Time'], errors='coerce')
+
+        # Extract hour and minute
+        data['Arrival_Time_hour'] = data['Arrival_Time'].dt.hour
+        data['Arrival_Time_minute'] = data['Arrival_Time'].dt.minute
+
+        # Drop the original 'Arrival_Time' column
+        data.drop('Arrival_Time', axis=1, inplace=True, errors='ignore')  # Use errors='ignore'
+
+    except Exception as e:
+        st.error(f"Error processing 'Arrival_Time' column: {e}")
+
+    # **Handle Duration Column**
+    def convert_duration_to_minutes(duration):
+        try:
+            # Use regular expression to extract hours and minutes
+            match = re.match(r'(\d+)h\s*(\d+)m', str(duration))  # Added str() conversion
+            if match:
+                hours = int(match.group(1))
+                minutes = int(match.group(2))
+                return hours * 60 + minutes
+            else:
+                # Handle cases where only hours or minutes are present
+                match_hours = re.match(r'(\d+)h', str(duration))
+                match_minutes = re.match(r'(\d+)m', str(duration))
+
+                if match_hours:
+                    hours = int(match_hours.group(1))
+                    return hours * 60
+                elif match_minutes:
+                    minutes = int(match_minutes.group(1))
+                    return minutes
+                else:
+                    return 0  # Default to 0 if no match
+        except:
+            return 0  # Handle any unexpected errors
+
+    data['Duration_minutes'] = data['Duration'].apply(convert_duration_to_minutes)
+    data.drop('Duration', axis=1, inplace=True, errors='ignore')
+
+    # **Handle Additional_Info Column**
+    data.drop('Additional_Info', axis=1, inplace=True, errors='ignore')
+
+    # **Handle Cabin_Class Column**
+    data['Cabin_Class'] = data['Cabin_Class'].astype('category').cat.codes
+
+    # **Handle Flight_Layover Column**
+    data['Flight_Layover'] = data['Flight_Layover'].astype('category').cat.codes
+
+    # **Handle Booking_Date Column**
+    try:
+        data['Booking_Date'] = pd.to_datetime(data['Booking_Date'], errors='coerce')
+        data['Booking_Day'] = data['Booking_Date'].dt.day
+        data['Booking_Month'] = data['Booking_Date'].dt.month
+        data['Booking_Year'] = data['Booking_Date'].dt.year  # Extract year as well
+        data.drop('Booking_Date', axis=1, inplace=True, errors='ignore')
+    except Exception as e:
+        st.error(f"Error processing 'Booking_Date' column: {e}")
 
     # --- Feature Engineering and Encoding ---
-    # ... (Feature engineering and encoding code) ...
-
-    # --- Data Preparation for Modeling ---
-    # Drop any columns with non-finite values (NaN, inf, -inf)
-    data = data.dropna(axis=1, how='any')
 
     # Store original values for mapping in prediction
     airline_mapping = dict(enumerate(data['Airline'].astype('category').cat.categories))
@@ -97,6 +188,19 @@ if data is not None:
     X = data.drop(['Price'], axis=1, errors='ignore') # Ignore if 'Price' is already dropped
     y = data['Price']
 
+    # Check data types of X
+    st.write("Data types of X before train_test_split:")
+    st.write(X.dtypes)
+
+    # Convert object columns to numeric (if possible) or categorical
+    for col in X.columns:
+        if X[col].dtype == 'object':
+            try:
+                X[col] = pd.to_numeric(X[col])
+            except ValueError:
+                st.warning(f"Column '{col}' could not be converted to numeric. Treating as categorical.")
+                X[col] = X[col].astype('category').cat.codes
+
     st.write(f"Shape of X: {X.shape}")  # Debugging statement
     st.write(f"Shape of y: {y.shape}")  # Debugging statement
 
@@ -105,6 +209,10 @@ if data is not None:
 
         # Split data into training and testing sets
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+        # Check data types of X_train
+        st.write("Data types of X_train after train_test_split:")
+        st.write(X_train.dtypes)
 
         if X_train is not None and not X_train.empty:
             st.write("X_train is not None and not empty!")  # Debugging statement
@@ -289,25 +397,25 @@ if data is not None:
             fig_boxplot_cabin.tight_layout()
             st.pyplot(fig_boxplot_cabin)
 
-            # Set style for a clean, modern look
+            # Set style
             st.subheader("Price Distribution by Cabin Class")
             sns.set(style="whitegrid")
             fig_boxplot_cabin2, ax_boxplot_cabin2 = plt.subplots(figsize=(10, 6))
             sns.boxplot(x="Cabin_Class", y="Price", data=data, palette="Set2", hue="Cabin_Class", ax=ax_boxplot_cabin2)
-            ax_boxplot_cabin2.set_title("Price Distribution by Cabin Class ", fontsize=14, fontweight='bold', color="#2c3e50")
+            ax_boxplot_cabin2.set_title("Price Distribution by Cabin Class", fontsize=14, fontweight='bold', color="#2c3e50")
             ax_boxplot_cabin2.set_xlabel("Cabin Class", fontsize=12)
             ax_boxplot_cabin2.set_ylabel("Price ($)", fontsize=12)
             ax_boxplot_cabin2.grid(True, which='both', linestyle='--', linewidth=0.7, alpha=0.6)
             fig_boxplot_cabin2.tight_layout()
             st.pyplot(fig_boxplot_cabin2)
 
-            # Set style for a clean, modern look
+            # Set style
             st.subheader("Price Distribution by Airline")
             sns.set(style="whitegrid")
             fig_boxplot_airline, ax_boxplot_airline = plt.subplots(figsize=(10, 6))
             sns.boxplot(x="Airline", y="Price", data=data.sort_values('Price', ascending=False), hue="Airline", palette="Set2", ax=ax_boxplot_airline)
-            ax_boxplot_airline.set_title(" Price Distribution by Airline", fontsize=14, fontweight='bold', color="#2c3e50")
-            ax_boxplot_airline.set_xlabel("Airline ", fontsize=12)
+            ax_boxplot_airline.set_title("Price Distribution by Airline", fontsize=14, fontweight='bold', color="#2c3e50")
+            ax_boxplot_airline.set_xlabel("Airline", fontsize=12)
             ax_boxplot_airline.set_ylabel("Price", fontsize=12)
             ax_boxplot_airline.tick_params(axis='x', rotation=90)
             ax_boxplot_airline.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
