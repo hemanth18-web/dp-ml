@@ -175,17 +175,21 @@ if data is not None:
     source_mapping = dict(enumerate(data['Source'].astype('category').cat.categories))
     destination_mapping = dict(enumerate(data['Destination'].astype('category').cat.categories))
 
+    # Create a new column with original airline names
+    data['Airline_Name'] = data['Airline'].map(airline_mapping)
+
     # Convert categorical features to numerical
     for col in ['Airline', 'Source', 'Destination']:
         data[col] = data[col].astype('category').cat.codes
 
     # Extract date features
     data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], errors='coerce') # Handle potential parsing errors
+    data['Date_of_Journey_Copy'] = data['Date_of_Journey'].copy()  # Create a copy
     data['Journey_Day'] = data['Date_of_Journey'].dt.day
     data['Journey_Month'] = data['Date_of_Journey'].dt.month
     data.drop('Date_of_Journey', axis=1, inplace=True)
 
-    X = data.drop(['Price'], axis=1, errors='ignore') # Ignore if 'Price' is already dropped
+    X = data.drop(['Price', 'Airline_Name', 'Date_of_Journey_Copy'], axis=1, errors='ignore') # Ignore if 'Price' is already dropped
     y = data['Price']
 
     # Convert object columns to numeric (if possible) or categorical
@@ -307,13 +311,13 @@ if data is not None:
 
     with st.expander("Visualizations"):
         if data is not None:
-            # Check if 'Date_of_Journey', 'Price', and 'Airline' exist in data
-            if 'Date_of_Journey' in data.columns and 'Price' in data.columns and 'Airline' in data.columns:
+            # Check if 'Date_of_Journey_Copy', 'Price', and 'Airline_Name' exist in data
+            if 'Date_of_Journey_Copy' in data.columns and 'Price' in data.columns and 'Airline_Name' in data.columns:
                 st.header("Visualizations")
                 # Airline Distribution
                 st.subheader("Airline Distribution")
                 fig_airline, ax_airline = plt.subplots(figsize=(10, 6))
-                sns.countplot(x="Airline", data=data, ax=ax_airline, palette="muted", order=data['Airline'].value_counts().index)  # Order by frequency
+                sns.countplot(x="Airline_Name", data=data, ax=ax_airline, palette="muted", order=data['Airline_Name'].value_counts().index)  # Order by frequency
                 ax_airline.tick_params(axis='x', rotation=90)
                 st.pyplot(fig_airline)
 
@@ -343,7 +347,7 @@ if data is not None:
                 # --- ADDED: Airline Distribution Countplot with Styling ---
                 st.subheader("Airline Distribution (Styled)")
                 fig_countplot, ax_countplot = plt.subplots(figsize=(10, 6))
-                sns.countplot(x="Airline", data=data, hue="Airline", palette="muted", legend=False, ax=ax_countplot)
+                sns.countplot(x="Airline_Name", data=data, hue="Airline_Name", palette="muted", legend=False, ax=ax_countplot)
                 ax_countplot.set_title("✈️ Airline Distribution ✈️", fontweight="bold", fontsize=14, color="#80aaff")
                 ax_countplot.set_xlabel("Airline")
                 ax_countplot.set_ylabel("Count")
@@ -354,7 +358,7 @@ if data is not None:
                 # Create the line plot
                 st.subheader("Ticket Price Trends Over Time")
                 fig_lineplot, ax_lineplot = plt.subplots(figsize=(10, 6))
-                sns.lineplot(x="Date_of_Journey", y="Price", data=data, hue="Airline", marker="o", palette="viridis", ax=ax_lineplot)  # Changed x to "Date_of_Journey" and y to "Price"
+                sns.lineplot(x="Date_of_Journey_Copy", y="Price", data=data, hue="Airline_Name", marker="o", palette="viridis", ax=ax_lineplot)  # Changed x to "Date_of_Journey" and y to "Price"
                 ax_lineplot.set_title("Ticket Price Trends Over Time", fontsize=14, fontweight="bold")
                 ax_lineplot.set_xlabel("Date", fontsize=12)
                 ax_lineplot.set_ylabel("Price (₹) ", fontsize=12)
@@ -377,7 +381,7 @@ if data is not None:
                 st.subheader("Price Distribution by Cabin Class (Customized)")
                 sns.set(style="whitegrid")
                 fig_boxplot_cabin, ax_boxplot_cabin = plt.subplots(figsize=(10, 8))
-                sns.boxplot(x="Cabin_Class", y="Price", data=data, palette="Set1", hue="Airline", ax=ax_boxplot_cabin)
+                sns.boxplot(x="Cabin_Class", y="Price", data=data, palette="Set1", hue="Airline_Name", ax=ax_boxplot_cabin)
                 ax_boxplot_cabin.set_title("Price Distribution by Cabin Class (Customized)", fontsize=14, fontweight='bold')
                 ax_boxplot_cabin.set_xlabel("Cabin Class", fontsize=12)
                 ax_boxplot_cabin.set_ylabel("Price ()", fontsize=12)
@@ -401,7 +405,7 @@ if data is not None:
                 st.subheader("Price Distribution by Airline")
                 sns.set(style="whitegrid")
                 fig_boxplot_airline, ax_boxplot_airline = plt.subplots(figsize=(10, 6))
-                sns.boxplot(x="Airline", y="Price", data=data.sort_values('Price', ascending=False), hue="Airline", palette="Set2", ax=ax_boxplot_airline)
+                sns.boxplot(x="Airline_Name", y="Price", data=data.sort_values('Price', ascending=False), hue="Airline_Name", palette="Set2", ax=ax_boxplot_airline)
                 ax_boxplot_airline.set_title("Price Distribution by Airline", fontsize=14, fontweight='bold', color="#2c3e50")
                 ax_boxplot_airline.set_xlabel("Airline", fontsize=12)
                 ax_boxplot_airline.set_ylabel("Price", fontsize=12)
@@ -410,7 +414,7 @@ if data is not None:
                 fig_boxplot_airline.tight_layout()
                 st.pyplot(fig_boxplot_airline)
             else:
-                st.write("Required columns ('Date_of_Journey', 'Price', 'Airline') are missing. Visualizations cannot be displayed.")
+                st.write("Required columns ('Date_of_Journey_Copy', 'Price', 'Airline_Name') are missing. Visualizations cannot be displayed.")
         else:
             st.write("Visualizations are not available because the data failed to load.")
 else:
