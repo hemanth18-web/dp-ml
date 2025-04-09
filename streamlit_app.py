@@ -305,15 +305,22 @@ if data is not None:
         if data is not None:
             st.header("Data Summary")
             st.write(f"Number of rows: {data.shape[0]}")
-            st.write(f"Number of columns: {data.shape[1]}")
         else:
             st.write("Data summary is not available because the data failed to load.")
 
     with st.expander("Visualizations"):
-        if data is not None:
+        if data is not None and not data.empty:
             # Check if 'Date_of_Journey_Copy', 'Price', and 'Airline_Name' exist in data
             if 'Date_of_Journey_Copy' in data.columns and 'Price' in data.columns and 'Airline_Name' in data.columns:
                 st.header("Visualizations")
+
+                # Debugging: Print the first few rows and unique values
+                st.write("First 5 rows of data:")
+                st.dataframe(data.head())
+                st.write("Unique values in Date_of_Journey_Copy:", data['Date_of_Journey_Copy'].unique())
+                st.write("Unique values in Price:", data['Price'].unique())
+                st.write("Unique values in Airline_Name:", data['Airline_Name'].unique())
+
                 # Airline Distribution
                 st.subheader("Airline Distribution")
                 fig_airline, ax_airline = plt.subplots(figsize=(10, 6))
