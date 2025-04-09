@@ -127,6 +127,9 @@ if data is not None:
     # **Handle Cabin_Class Column**
     data['Cabin_Class'] = data['Cabin_Class'].astype('category').cat.codes
 
+    # **Handle Flight_Layover Column**
+    data['Flight_Layover'] = data['Flight_Layover'].astype('category').cat.codes
+
     # --- Feature Engineering and Encoding ---
 
     # Convert categorical features to numerical
