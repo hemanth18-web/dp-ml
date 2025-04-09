@@ -34,10 +34,25 @@ def load_data_from_github(url):
         return None
 
 # Load the dataset
-data = load_data_from_github(github_url)
+data = load_data_from_github(url)
 
 # --- STREAMLIT APP ---
-st.title("Flight Fare Data Exploration and Prediction")
+st.set_page_config(page_title="Flight Fare Predictor", page_icon="✈️")
+
+# Custom CSS for styling
+st.markdown("""
+    <style>
+    .big-font {
+        font-size:24px !important;
+        font-weight: bold;
+    }
+    .medium-font {
+        font-size:18px !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.title("✈️ Flight Fare Prediction App")
 
 if data is not None:
     # --- Data Cleaning and Conversion ---
@@ -161,14 +176,6 @@ if data is not None:
     # Drop any columns with non-finite values (NaN, inf, -inf)
     data = data.dropna(axis=1, how='any')
 
-    # Ensure all columns are numeric
-    for col in data.columns:
-        try:
-            data[col] = pd.to_numeric(data[col])
-        except ValueError:
-            st.error(f"Could not convert column '{col}' to numeric.  Please investigate.")
-            st.stop()  # Stop execution if a column cannot be converted
-
     X = data.drop(['Price'], axis=1, errors='ignore') # Ignore if 'Price' is already dropped
     y = data['Price']
 
@@ -181,11 +188,14 @@ if data is not None:
     random_forest_model.fit(X_train, y_train)
 
     # --- Model Evaluation ---
-    y_pred = random_forest_model.predict(X_test)
-    mse = mean_squared_error(y_test, y_pred)
-    r2 = r2_score(y_test, y_pred)
-    st.write(f"Mean Squared Error: {mse:.2f}")
-    st.write(f"R^2 Score: {r2:.2f}")
+    st.header("Model Evaluation")
+    col1, col2 = st.columns(2)
+    with col1:
+        mse = mean_squared_error(y_test, y_pred)
+        st.metric("Mean Squared Error", f"{mse:.2f}")
+    with col2:
+        r2 = r2_score(y_test, y_pred)
+        st.metric("R^2 Score", f"{r2:.2f}")
 
     # --- Feature Importance Plot ---
     st.subheader("Feature Importance")
@@ -197,24 +207,23 @@ if data is not None:
     st.pyplot(fig_feature_importance)
 
     # --- Prediction Interface ---
-    st.header("Flight Fare Prediction")
-    # Input fields
+    st.sidebar.header("Flight Details for Prediction")
 
     # Use original names in selectboxes
-    source = st.selectbox("Source", options=list(source_mapping.values()))
-    destination = st.selectbox("Destination", options=list(destination_mapping.values()))
-    airline = st.selectbox("Airline", options=list(airline_mapping.values()))
+    source = st.sidebar.selectbox("Source Airport", options=list(source_mapping.values()))
+    destination = st.sidebar.selectbox("Destination Airport", options=list(destination_mapping.values()))
+    airline = st.sidebar.selectbox("Airline", options=list(airline_mapping.values()))
 
-    stops = st.slider("Number of Stops", min_value=0, max_value=5, value=1)
-    dep_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=10)
-    dep_minute = st.slider("Departure Minute", min_value=0, max_value=59, value=30)
-    arrival_hour = st.slider("Arrival Hour", min_value=0, max_value=23, value=13)
-    arrival_minute = st.slider("Arrival Minute", min_value=0, max_value=59, value=45)
-    journey_day = st.slider("Journey Day", min_value=1, max_value=31, value=15)
-    journey_month = st.slider("Journey Month", min_value=1, max_value=12, value=3)
+    stops = st.sidebar.slider("Number of Stops", min_value=0, max_value=5, value=1)
+    dep_hour = st.sidebar.slider("Departure Hour", min_value=0, max_value=23, value=10)
+    dep_minute = st.sidebar.slider("Departure Minute", min_value=0, max_value=59, value=30)
+    arrival_hour = st.sidebar.slider("Arrival Hour", min_value=0, max_value=23, value=13)
+    arrival_minute = st.sidebar.slider("Arrival Minute", min_value=0, max_value=59, value=45)
+    journey_day = st.sidebar.slider("Journey Day", min_value=1, max_value=31, value=15)
+    journey_month = st.sidebar.slider("Journey Month", min_value=1, max_value=12, value=3)
 
     # Prediction button
-    if st.button("Predict Fare"):
+    if st.sidebar.button("Predict Fare"):
         # Prepare input data
 
         # Map names back to numerical codes
@@ -243,114 +252,117 @@ if data is not None:
 
         # Make prediction
         predicted_fare = random_forest_model.predict(input_data)[0]
-        st.success(f"Predicted Flight Fare: ₹{predicted_fare:.2f}")
+        st.success(f"The predicted flight fare is: ₹{predicted_fare:.2f}")
 
-    st.header("Data Preview")
-    st.dataframe(data.head())
-    st.header("Data Summary")
-    st.write(f"Number of rows: {data.shape[0]}")
-    st.write(f"Number of columns: {data.shape[1]}")
+    with st.expander("Data Preview"):
+        st.header("Data Preview")
+        st.dataframe(data.head())
 
-    # --- VISUALIZATIONS ---
-    st.header("Visualizations")
-    # Airline Distribution
-    st.subheader("Airline Distribution")
-    fig_airline, ax_airline = plt.subplots(figsize=(10, 6))
-    sns.countplot(x="Airline", data=data, ax=ax_airline, palette="muted", order=data['Airline'].value_counts().index)  # Order by frequency
-    ax_airline.tick_params(axis='x', rotation=90)
-    st.pyplot(fig_airline)
+    with st.expander("Data Summary"):
+        st.header("Data Summary")
+        st.write(f"Number of rows: {data.shape[0]}")
+        st.write(f"Number of columns: {data.shape[1]}")
 
-    # Price vs. Number of Stops (Scatter Plot)
-    st.subheader("Price vs. Number of Stops")
-    fig_scatter, ax_scatter = plt.subplots(figsize=(10, 6))
-    sns.scatterplot(x="Price", y="Total_Stops", data=data, ax=ax_scatter)
-    st.pyplot(fig_scatter)
+    with st.expander("Visualizations"):
+        st.header("Visualizations")
+        # Airline Distribution
+        st.subheader("Airline Distribution")
+        fig_airline, ax_airline = plt.subplots(figsize=(10, 6))
+        sns.countplot(x="Airline", data=data, ax=ax_airline, palette="muted", order=data['Airline'].value_counts().index)  # Order by frequency
+        ax_airline.tick_params(axis='x', rotation=90)
+        st.pyplot(fig_airline)
 
-    # Price Distribution (Histogram)
-    st.subheader("Price Distribution")
-    fig_hist, ax_hist = plt.subplots(figsize=(10, 6))
-    sns.histplot(data['Price'], kde=True, ax=ax_hist)
-    st.pyplot(fig_hist)
+        # Price vs. Number of Stops (Scatter Plot)
+        st.subheader("Price vs. Number of Stops")
+        fig_scatter, ax_scatter = plt.subplots(figsize=(10, 6))
+        sns.scatterplot(x="Price", y="Total_Stops", data=data, ax=ax_scatter)
+        st.pyplot(fig_scatter)
 
-    # --- ADDED: Scatter plot with customized aesthetics ---
-    st.header("Price vs Number of Stops (Customized)")
-    fig_scatter_custom, ax_scatter_custom = plt.subplots(figsize=(10, 6))
-    scatter = ax_scatter_custom.scatter(data['Price'], data['Total_Stops'], s=80, alpha=0.7, c=data['Price'], cmap='viridis', edgecolors='black')
-    ax_scatter_custom.set_title('Price vs Number of Stops', fontsize=14, fontweight='bold')
-    ax_scatter_custom.set_xlabel('Price', fontsize=12)
-    ax_scatter_custom.set_ylabel('Number of Stops', fontsize=12)
-    ax_scatter_custom.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
-    fig_scatter_custom.colorbar(scatter, label='Price')  # Add colorbar to the figure
-    st.pyplot(fig_scatter_custom)
+        # Price Distribution (Histogram)
+        st.subheader("Price Distribution")
+        fig_hist, ax_hist = plt.subplots(figsize=(10, 6))
+        sns.histplot(data['Price'], kde=True, ax=ax_hist)
+        st.pyplot(fig_hist)
 
-    # --- ADDED: Airline Distribution Countplot with Styling ---
-    st.header("Airline Distribution (Styled)")
-    fig_countplot, ax_countplot = plt.subplots(figsize=(10, 6))
-    sns.countplot(x="Airline", data=data, hue="Airline", palette="muted", legend=False, ax=ax_countplot)
-    ax_countplot.set_title("✈️ Airline Distribution ✈️", fontweight="bold", fontsize=14, color="#80aaff")
-    ax_countplot.set_xlabel("Airline")
-    ax_countplot.set_ylabel("Count")
-    ax_countplot.tick_params(axis='x', rotation=90, labelsize=8)
-    fig_countplot.tight_layout()
-    st.pyplot(fig_countplot)
+        # --- ADDED: Scatter plot with customized aesthetics ---
+        st.subheader("Price vs Number of Stops (Customized)")
+        fig_scatter_custom, ax_scatter_custom = plt.subplots(figsize=(10, 6))
+        scatter = ax_scatter_custom.scatter(data['Price'], data['Total_Stops'], s=80, alpha=0.7, c=data['Price'], cmap='viridis', edgecolors='black')
+        ax_scatter_custom.set_title('Price vs Number of Stops', fontsize=14, fontweight='bold')
+        ax_scatter_custom.set_xlabel('Price', fontsize=12)
+        ax_scatter_custom.set_ylabel('Number of Stops', fontsize=12)
+        ax_scatter_custom.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
+        fig_scatter_custom.colorbar(scatter, label='Price')  # Add colorbar to the figure
+        st.pyplot(fig_scatter_custom)
 
-    # Create the line plot
-    st.subheader("Ticket Price Trends Over Time")
-    fig_lineplot, ax_lineplot = plt.subplots(figsize=(10, 6))
-    sns.lineplot(x="Date_of_Journey", y="Price", data=data, hue="Airline", marker="o", palette="viridis", ax=ax_lineplot)  # Changed x to "Date_of_Journey" and y to "Price"
-    ax_lineplot.set_title("Ticket Price Trends Over Time", fontsize=14, fontweight="bold")
-    ax_lineplot.set_xlabel("Date", fontsize=12)
-    ax_lineplot.set_ylabel("Price (₹) ", fontsize=12)
-    ax_lineplot.tick_params(axis='x', rotation=90)
-    fig_lineplot.tight_layout()
-    st.pyplot(fig_lineplot)
+        # --- ADDED: Airline Distribution Countplot with Styling ---
+        st.subheader("Airline Distribution (Styled)")
+        fig_countplot, ax_countplot = plt.subplots(figsize=(10, 6))
+        sns.countplot(x="Airline", data=data, hue="Airline", palette="muted", legend=False, ax=ax_countplot)
+        ax_countplot.set_title("✈️ Airline Distribution ✈️", fontweight="bold", fontsize=14, color="#80aaff")
+        ax_countplot.set_xlabel("Airline")
+        ax_countplot.set_ylabel("Count")
+        ax_countplot.tick_params(axis='x', rotation=90, labelsize=8)
+        fig_countplot.tight_layout()
+        st.pyplot(fig_countplot)
 
-    # Assuming 'Days_Until_Departure' is in your data, we first calculate the frequency of each unique value
-    st.subheader("Days Until Departure (Line Plot)")
-    days_count = data['Days_Until_Departure'].value_counts().sort_index()
-    fig_days_line, ax_days_line = plt.subplots(figsize=(10, 6))
-    ax_days_line.plot(days_count.index, days_count.values, marker='o', color='skyblue', linewidth=2)
-    ax_days_line.set_title('Days Until Departure (Line Plot)', fontsize=12, fontweight='bold')
-    ax_days_line.set_xlabel('Days Until Departure', fontsize=12)
-    ax_days_line.set_ylabel('Count', fontsize=12)
-    fig_days_line.tight_layout()
-    st.pyplot(fig_days_line)
+        # Create the line plot
+        st.subheader("Ticket Price Trends Over Time")
+        fig_lineplot, ax_lineplot = plt.subplots(figsize=(10, 6))
+        sns.lineplot(x="Date_of_Journey", y="Price", data=data, hue="Airline", marker="o", palette="viridis", ax=ax_lineplot)  # Changed x to "Date_of_Journey" and y to "Price"
+        ax_lineplot.set_title("Ticket Price Trends Over Time", fontsize=14, fontweight="bold")
+        ax_lineplot.set_xlabel("Date", fontsize=12)
+        ax_lineplot.set_ylabel("Price (₹) ", fontsize=12)
+        ax_lineplot.tick_params(axis='x', rotation=90)
+        fig_lineplot.tight_layout()
+        st.pyplot(fig_lineplot)
 
-    # Set style
-    st.subheader("Price Distribution by Cabin Class (Customized)")
-    sns.set(style="whitegrid")
-    fig_boxplot_cabin, ax_boxplot_cabin = plt.subplots(figsize=(10, 8))
-    sns.boxplot(x="Cabin_Class", y="Price", data=data, palette="Set1", hue="Airline", ax=ax_boxplot_cabin)
-    ax_boxplot_cabin.set_title("Price Distribution by Cabin Class (Customized)", fontsize=14, fontweight='bold')
-    ax_boxplot_cabin.set_xlabel("Cabin Class", fontsize=12)
-    ax_boxplot_cabin.set_ylabel("Price ()", fontsize=12)
-    ax_boxplot_cabin.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
-    fig_boxplot_cabin.tight_layout()
-    st.pyplot(fig_boxplot_cabin)
+        # Assuming 'Days_Until_Departure' is in your data, we first calculate the frequency of each unique value
+        st.subheader("Days Until Departure (Line Plot)")
+        days_count = data['Days_Until_Departure'].value_counts().sort_index()
+        fig_days_line, ax_days_line = plt.subplots(figsize=(10, 6))
+        ax_days_line.plot(days_count.index, days_count.values, marker='o', color='skyblue', linewidth=2)
+        ax_days_line.set_title('Days Until Departure (Line Plot)', fontsize=12, fontweight='bold')
+        ax_days_line.set_xlabel('Days Until Departure', fontsize=12)
+        ax_days_line.set_ylabel('Count', fontsize=12)
+        fig_days_line.tight_layout()
+        st.pyplot(fig_days_line)
 
-    # Set style for a clean, modern look
-    st.subheader("Price Distribution by Cabin Class")
-    sns.set(style="whitegrid")
-    fig_boxplot_cabin2, ax_boxplot_cabin2 = plt.subplots(figsize=(10, 6))
-    sns.boxplot(x="Cabin_Class", y="Price", data=data, palette="Set2", hue="Cabin_Class", ax=ax_boxplot_cabin2)
-    ax_boxplot_cabin2.set_title("Price Distribution by Cabin Class ", fontsize=14, fontweight='bold', color="#2c3e50")
-    ax_boxplot_cabin2.set_xlabel("Cabin Class", fontsize=12)
-    ax_boxplot_cabin2.set_ylabel("Price ($)", fontsize=12)
-    ax_boxplot_cabin2.grid(True, which='both', linestyle='--', linewidth=0.7, alpha=0.6)
-    fig_boxplot_cabin2.tight_layout()
-    st.pyplot(fig_boxplot_cabin2)
+        # Set style
+        st.subheader("Price Distribution by Cabin Class (Customized)")
+        sns.set(style="whitegrid")
+        fig_boxplot_cabin, ax_boxplot_cabin = plt.subplots(figsize=(10, 8))
+        sns.boxplot(x="Cabin_Class", y="Price", data=data, palette="Set1", hue="Airline", ax=ax_boxplot_cabin)
+        ax_boxplot_cabin.set_title("Price Distribution by Cabin Class (Customized)", fontsize=14, fontweight='bold')
+        ax_boxplot_cabin.set_xlabel("Cabin Class", fontsize=12)
+        ax_boxplot_cabin.set_ylabel("Price ()", fontsize=12)
+        ax_boxplot_cabin.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
+        fig_boxplot_cabin.tight_layout()
+        st.pyplot(fig_boxplot_cabin)
 
-    # Set style for a clean, modern look
-    st.subheader("Price Distribution by Airline")
-    sns.set(style="whitegrid")
-    fig_boxplot_airline, ax_boxplot_airline = plt.subplots(figsize=(10, 6))
-    sns.boxplot(x="Airline", y="Price", data=data.sort_values('Price', ascending=False), hue="Airline", palette="Set2", ax=ax_boxplot_airline)
-    ax_boxplot_airline.set_title(" Price Distribution by Airline", fontsize=14, fontweight='bold', color="#2c3e50")
-    ax_boxplot_airline.set_xlabel("Airline ", fontsize=12)
-    ax_boxplot_airline.set_ylabel("Price", fontsize=12)
-    ax_boxplot_airline.tick_params(axis='x', rotation=90)
-    ax_boxplot_airline.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
-    fig_boxplot_airline.tight_layout()
-    st.pyplot(fig_boxplot_airline)
+        # Set style for a clean, modern look
+        st.subheader("Price Distribution by Cabin Class")
+        sns.set(style="whitegrid")
+        fig_boxplot_cabin2, ax_boxplot_cabin2 = plt.subplots(figsize=(10, 6))
+        sns.boxplot(x="Cabin_Class", y="Price", data=data, palette="Set2", hue="Cabin_Class", ax=ax_boxplot_cabin2)
+        ax_boxplot_cabin2.set_title("Price Distribution by Cabin Class ", fontsize=14, fontweight='bold', color="#2c3e50")
+        ax_boxplot_cabin2.set_xlabel("Cabin Class", fontsize=12)
+        ax_boxplot_cabin2.set_ylabel("Price ($)", fontsize=12)
+        ax_boxplot_cabin2.grid(True, which='both', linestyle='--', linewidth=0.7, alpha=0.6)
+        fig_boxplot_cabin2.tight_layout()
+        st.pyplot(fig_boxplot_cabin2)
+
+        # Set style for a clean, modern look
+        st.subheader("Price Distribution by Airline")
+        sns.set(style="whitegrid")
+        fig_boxplot_airline, ax_boxplot_airline = plt.subplots(figsize=(10, 6))
+        sns.boxplot(x="Airline", y="Price", data=data.sort_values('Price', ascending=False), hue="Airline", palette="Set2", ax=ax_boxplot_airline)
+        ax_boxplot_airline.set_title(" Price Distribution by Airline", fontsize=14, fontweight='bold', color="#2c3e50")
+        ax_boxplot_airline.set_xlabel("Airline ", fontsize=12)
+        ax_boxplot_airline.set_ylabel("Price", fontsize=12)
+        ax_boxplot_airline.tick_params(axis='x', rotation=90)
+        ax_boxplot_airline.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
+        fig_boxplot_airline.tight_layout()
+        st.pyplot(fig_boxplot_airline)
 else:
     st.write("Failed to load data.  Check the GitHub URL and your internet connection.")
