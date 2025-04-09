@@ -76,23 +76,43 @@ if data is not None:
     # ... (Feature engineering and encoding code) ...
 
     # --- Data Preparation for Modeling ---
-    # ... (Data preparation code) ...
+    # Drop any columns with non-finite values (NaN, inf, -inf)
+    data = data.dropna(axis=1, how='any')
 
-    # Split data into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # Ensure all columns are numeric
+    for col in data.columns:
+        try:
+            data[col] = pd.to_numeric(data[col])
+        except ValueError:
+            st.error(f"Could not convert column '{col}' to numeric.  Please investigate.")
+            st.stop()  # Stop execution if a column cannot be converted
 
-    if X_train is not None and not X_train.empty:
-        st.write("X_train is not None and not empty!")  # Debugging statement
+    X = data.drop(['Price'], axis=1, errors='ignore') # Ignore if 'Price' is already dropped
+    y = data['Price']
 
-        # --- Model Training ---
-        st.header("Random Forest Model Training")
-        random_forest_model = RandomForestRegressor(n_estimators=100, random_state=42)
-        random_forest_model.fit(X_train, y_train)
+    st.write(f"Shape of X: {X.shape}")  # Debugging statement
+    st.write(f"Shape of y: {y.shape}")  # Debugging statement
 
-        y_pred = random_forest_model.predict(X_test)  # Calculate y_pred
-        st.write("Model prediction successful!") # Debugging statement
+    if X is not None and y is not None and not X.empty and not y.empty:
+        st.write("X and y are not None and not empty!")  # Debugging statement
+
+        # Split data into training and testing sets
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+        if X_train is not None and not X_train.empty:
+            st.write("X_train is not None and not empty!")  # Debugging statement
+
+            # --- Model Training ---
+            st.header("Random Forest Model Training")
+            random_forest_model = RandomForestRegressor(n_estimators=100, random_state=42)
+            random_forest_model.fit(X_train, y_train)
+
+            y_pred = random_forest_model.predict(X_test)  # Calculate y_pred
+            st.write("Model prediction successful!") # Debugging statement
+        else:
+            st.error("X_train is None or empty. Model training cannot be performed.")
     else:
-        st.error("X_train is None or empty. Model training cannot be performed.")
+        st.error("X or y is None or empty. Data splitting cannot be performed.")
 
     # --- Model Evaluation ---
     if y_pred is not None:  # Check if y_pred was successfully calculated
@@ -290,4 +310,3 @@ if data is not None:
             st.write("Visualizations are not available because the data failed to load.")
 else:
     st.write("Failed to load data.  Check the GitHub URL and your internet connection.")
-
