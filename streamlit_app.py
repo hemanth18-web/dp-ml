@@ -9,6 +9,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 import pickle
+import re  # Import the regular expression module
 
 # GitHub URL for the dataset
 github_url = "https://raw.githubusercontent.com/hemanth18-web/dp-ml/refs/heads/main/Updated_Flight_Fare_Data%20(20).csv"
@@ -92,6 +93,34 @@ if data is not None:
     except Exception as e:
         st.error(f"Error processing 'Arrival_Time' column: {e}")
 
+    # **Handle Duration Column**
+    def convert_duration_to_minutes(duration):
+        try:
+            # Use regular expression to extract hours and minutes
+            match = re.match(r'(\d+)h\s*(\d+)m', str(duration))  # Added str() conversion
+            if match:
+                hours = int(match.group(1))
+                minutes = int(match.group(2))
+                return hours * 60 + minutes
+            else:
+                # Handle cases where only hours or minutes are present
+                match_hours = re.match(r'(\d+)h', str(duration))
+                match_minutes = re.match(r'(\d+)m', str(duration))
+
+                if match_hours:
+                    hours = int(match_hours.group(1))
+                    return hours * 60
+                elif match_minutes:
+                    minutes = int(match_minutes.group(1))
+                    return minutes
+                else:
+                    return 0  # Default to 0 if no match
+        except:
+            return 0  # Handle any unexpected errors
+
+    data['Duration_minutes'] = data['Duration'].apply(convert_duration_to_minutes)
+    data.drop('Duration', axis=1, inplace=True, errors='ignore')
+
     # --- Feature Engineering and Encoding ---
 
     # Convert categorical features to numerical
@@ -155,8 +184,8 @@ if data is not None:
     dep_minute = st.slider("Departure Minute", min_value=0, max_value=59, value=30)
     arrival_hour = st.slider("Arrival Hour", min_value=0, max_value=23, value=13)
     arrival_minute = st.slider("Arrival Minute", min_value=0, max_value=59, value=45)
-    duration_hours = st.slider("Duration Hours", min_value=0, max_value=20, value=3)
-    duration_minutes = st.slider("Duration Minutes", min_value=0, max_value=59, value=15)
+    #duration_hours = st.slider("Duration Hours", min_value=0, max_value=20, value=3)
+    #duration_minutes = st.slider("Duration Minutes", min_value=0, max_value=59, value=15)
     journey_day = st.slider("Journey Day", min_value=1, max_value=31, value=15)
     journey_month = st.slider("Journey Month", min_value=1, max_value=12, value=3)
 
@@ -172,8 +201,8 @@ if data is not None:
             'Dep_Time_minute': [dep_minute],
             'Arrival_Time_hour': [arrival_hour],
             'Arrival_Time_minute': [arrival_minute],
-            'Duration_hours': [duration_hours],
-            'Duration_minutes': [duration_minutes],
+            #'Duration_hours': [duration_hours],
+            #'Duration_minutes': [duration_minutes],
             'Journey_Day': [journey_day],
             'Journey_Month': [journey_month]
         })
