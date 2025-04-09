@@ -71,7 +71,7 @@ if data is not None:
 
     st.header("Data Summary")
     st.write(f"Number of rows: {data.shape[0]}")
-    st.write(f"Number of columns: {data.shape[1]")
+    st.write(f"Number of columns: {data.shape[1]}")
 
     # --- UNIQUE VALUES ---
     st.header("Unique Values in Each Column")
