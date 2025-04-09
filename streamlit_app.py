@@ -61,7 +61,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("✈️ Flight Fare Prediction App")
+st.title("✈️ Flight Fare Prediction App2")
 
 y_pred = None  # Initialize y_pred to None
 random_forest_model = None # Initialize the model to None
