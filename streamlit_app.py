@@ -196,6 +196,8 @@ if data is not None:
     random_forest_model = RandomForestRegressor(n_estimators=100, random_state=42)
     random_forest_model.fit(X_train, y_train)
 
+    y_pred = random_forest_model.predict(X_test)  # Move this line here
+
     # --- Model Evaluation ---
     st.header("Model Evaluation")
     col1, col2 = st.columns(2)
