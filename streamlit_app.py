@@ -46,7 +46,22 @@ def load_data_from_github(url):
 data = load_data_from_github(github_url)
 
 # --- STREAMLIT APP ---
-st.title("Flight Fare Data Exploration and Prediction")
+st.set_page_config(page_title="Flight Fare Predictor", page_icon="✈️")
+
+# Custom CSS for styling
+st.markdown("""
+    <style>
+    .big-font {
+        font-size:24px !important;
+        font-weight: bold;
+    }
+    .medium-font {
+        font-size:18px !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+st.title("✈️ Flight Fare Prediction App")
 
 if data is not None:
     # --- Data Cleaning and Conversion ---
@@ -166,7 +181,7 @@ if data is not None:
     data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], errors='coerce') # Handle potential parsing errors
     data['Journey_Day'] = data['Date_of_Journey'].dt.day
     data['Journey_Month'] = data['Date_of_Journey'].dt.month
-    #data.drop('Date_of_Journey', axis=1, inplace=True) # Remove this line
+    #data.drop('Date_of_Journey', axis=1, inplace=True)
 
     # --- Data Preparation for Modeling ---
     # Drop any columns with non-finite values (NaN, inf, -inf)
