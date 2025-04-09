@@ -5,6 +5,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import requests
 import io
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
+import pickle
 
 # GitHub URL for the dataset
 github_url = "https://raw.githubusercontent.com/hemanth18-web/dp-ml/refs/heads/main/Updated_Flight_Fare_Data%20(20).csv"
@@ -32,7 +36,7 @@ def load_data_from_github(url):
 data = load_data_from_github(github_url)
 
 # --- STREAMLIT APP ---
-st.title("Flight Fare Data Exploration3")
+st.title("Flight Fare Data Exploration and Prediction")
 
 if data is not None:
     # --- Data Cleaning and Conversion ---
@@ -66,6 +70,86 @@ if data is not None:
 
     # Convert 'Total_Stops' to numeric
     data['Total_Stops'] = pd.to_numeric(data['Total_Stops'])
+
+    # --- Feature Engineering and Encoding ---
+    # Convert categorical features to numerical
+    for col in ['Airline', 'Source', 'Destination']:
+        data[col] = data[col].astype('category').cat.codes
+
+    # Extract date features
+    data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'])
+    data['Journey_Day'] = data['Date_of_Journey'].dt.day
+    data['Journey_Month'] = data['Date_of_Journey'].dt.month
+    data.drop('Date_of_Journey', axis=1, inplace=True)
+
+    # --- Data Preparation for Modeling ---
+    X = data.drop(['Price'], axis=1)
+    y = data['Price']
+
+    # Split data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # --- Model Training ---
+    st.header("Random Forest Model Training")
+    random_forest_model = RandomForestRegressor(n_estimators=100, random_state=42)
+    random_forest_model.fit(X_train, y_train)
+
+    # --- Model Evaluation ---
+    y_pred = random_forest_model.predict(X_test)
+    mse = mean_squared_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred)
+
+    st.write(f"Mean Squared Error: {mse:.2f}")
+    st.write(f"R^2 Score: {r2:.2f}")
+
+    # --- Feature Importance Plot ---
+    st.subheader("Feature Importance")
+    feature_importance = pd.Series(random_forest_model.feature_importances_, index=X.columns).sort_values(ascending=False)
+    fig_feature_importance, ax_feature_importance = plt.subplots(figsize=(10, 6))
+    feature_importance.plot(kind='bar', ax=ax_feature_importance)
+    ax_feature_importance.set_title("Feature Importance from Random Forest")
+    ax_feature_importance.set_ylabel("Importance Score")
+    st.pyplot(fig_feature_importance)
+
+    # --- Prediction Interface ---
+    st.header("Flight Fare Prediction")
+
+    # Input fields
+    source = st.selectbox("Source", options=data['Source'].unique())
+    destination = st.selectbox("Destination", options=data['Destination'].unique())
+    stops = st.slider("Number of Stops", min_value=0, max_value=5, value=1)
+    airline = st.selectbox("Airline", options=data['Airline'].unique())
+    dep_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=10)
+    dep_minute = st.slider("Departure Minute", min_value=0, max_value=59, value=30)
+    arrival_hour = st.slider("Arrival Hour", min_value=0, max_value=23, value=13)
+    arrival_minute = st.slider("Arrival Minute", min_value=0, max_value=59, value=45)
+    duration_hours = st.slider("Duration Hours", min_value=0, max_value=20, value=3)
+    duration_minutes = st.slider("Duration Minutes", min_value=0, max_value=59, value=15)
+    journey_day = st.slider("Journey Day", min_value=1, max_value=31, value=15)
+    journey_month = st.slider("Journey Month", min_value=1, max_value=12, value=3)
+
+    # Prediction button
+    if st.button("Predict Fare"):
+        # Prepare input data
+        input_data = pd.DataFrame({
+            'Airline': [airline],
+            'Source': [source],
+            'Destination': [destination],
+            'Total_Stops': [stops],
+            'Dep_Time_hour': [dep_hour],
+            'Dep_Time_minute': [dep_minute],
+            'Arrival_Time_hour': [arrival_hour],
+            'Arrival_Time_minute': [arrival_minute],
+            'Duration_hours': [duration_hours],
+            'Duration_minutes': [duration_minutes],
+            'Journey_Day': [journey_day],
+            'Journey_Month': [journey_month]
+        })
+
+        # Make prediction
+        predicted_fare = random_forest_model.predict(input_data)[0]
+
+        st.success(f"Predicted Flight Fare: ₹{predicted_fare:.2f}")
 
     st.header("Data Preview")
     st.dataframe(data.head())
