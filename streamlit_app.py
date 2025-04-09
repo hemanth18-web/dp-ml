@@ -79,13 +79,20 @@ if data is not None:
     # Drop any columns with non-finite values (NaN, inf, -inf)
     data = data.dropna(axis=1, how='any')
 
-    # Ensure all columns are numeric
-    for col in data.columns:
-        try:
-            data[col] = pd.to_numeric(data[col])
-        except ValueError:
-            st.error(f"Could not convert column '{col}' to numeric.  Please investigate.")
-            st.stop()  # Stop execution if a column cannot be converted
+    # Store original values for mapping in prediction
+    airline_mapping = dict(enumerate(data['Airline'].astype('category').cat.categories))
+    source_mapping = dict(enumerate(data['Source'].astype('category').cat.categories))
+    destination_mapping = dict(enumerate(data['Destination'].astype('category').cat.categories))
+
+    # Convert categorical features to numerical
+    for col in ['Airline', 'Source', 'Destination']:
+        data[col] = data[col].astype('category').cat.codes
+
+    # Extract date features
+    data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], errors='coerce') # Handle potential parsing errors
+    data['Journey_Day'] = data['Date_of_Journey'].dt.day
+    data['Journey_Month'] = data['Date_of_Journey'].dt.month
+    data.drop('Date_of_Journey', axis=1, inplace=True)
 
     X = data.drop(['Price'], axis=1, errors='ignore') # Ignore if 'Price' is already dropped
     y = data['Price']
