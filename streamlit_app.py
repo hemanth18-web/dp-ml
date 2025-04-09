@@ -124,6 +124,9 @@ if data is not None:
     # **Handle Additional_Info Column**
     data.drop('Additional_Info', axis=1, inplace=True, errors='ignore')
 
+    # **Handle Cabin_Class Column**
+    data['Cabin_Class'] = data['Cabin_Class'].astype('category').cat.codes
+
     # --- Feature Engineering and Encoding ---
 
     # Convert categorical features to numerical
