@@ -53,78 +53,109 @@ st.markdown("""
     <style>
     /* General styling */
     body {
-        font-family: 'Helvetica Neue', sans-serif;
-        color: #333;
-        background-color: #f9f9f9;
+        font-family: 'Arial', sans-serif;
+        color: #262730;
+        background-color: #f0f2f6;
     }
     .stApp {
         max-width: 1600px;
         margin: 0 auto;
-        padding: 20px;
+        padding: 30px;
     }
     /* Header styling */
     h1 {
-        color: #2E86C1;
+        color: #39A7FF;
         text-align: center;
-        margin-bottom: 30px;
+        margin-bottom: 40px;
+        font-size: 3em;
+        font-weight: bold;
     }
     /* Sidebar styling */
     .stSidebar {
-        background-color: #EBF5FB;
-        padding: 20px;
-        border-radius: 10px;
+        background-color: #FFFFFF;
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
     }
     .stSidebar h2 {
-        color: #2E86C1;
-        margin-bottom: 20px;
+        color: #39A7FF;
+        margin-bottom: 30px;
+        font-size: 1.8em;
     }
     /* Input elements styling */
     .stSelectbox, .stSlider, .stDateInput {
-        margin-bottom: 20px;
+        margin-bottom: 25px;
     }
     /* Button styling */
     .stButton > button {
-        background-color: #2E86C1;
+        background-color: #39A7FF;
         color: white;
-        font-size: 16px;
-        padding: 10px 20px;
-        border-radius: 5px;
+        font-size: 18px;
+        padding: 12px 24px;
+        border-radius: 8px;
         border: none;
         cursor: pointer;
         transition: background-color 0.3s;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
     }
     .stButton > button:hover {
-        background-color: #1A5276;
+        background-color: #1E86FF;
     }
     /* Dataframe styling */
     .stDataFrame {
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        padding: 10px;
+        border: 1px solid #e1e1e8;
+        border-radius: 8px;
+        padding: 20px;
         background-color: white;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
     }
     /* Metric styling */
     .stMetric {
         background-color: white;
-        border-radius: 5px;
-        padding: 20px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+        border-radius: 8px;
+        padding: 25px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
     }
     .stMetric label {
         font-weight: bold;
         color: #555;
+        font-size: 1.2em;
     }
     .stMetric > div:nth-child(2) {
-        font-size: 24px;
-        color: #2E86C1;
+        font-size: 2.2em;
+        color: #39A7FF;
     }
     /* Visualization styling */
     .stPlot {
         background-color: white;
+        border-radius: 8px;
+        padding: 25px;
+        margin-bottom: 30px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    }
+    /* Divider styling */
+    hr {
+        border: none;
+        height: 2px;
+        background-color: #e1e1e8;
+        margin: 30px 0;
+    }
+    /* Info boxes */
+    .info-box {
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
         border-radius: 5px;
-        padding: 20px;
+        padding: 15px;
         margin-bottom: 20px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+    }
+    .info-box h3 {
+        color: #39A7FF;
+        font-size: 1.4em;
+        margin-bottom: 10px;
+    }
+    .info-box p {
+        color: #555;
+        font-size: 1.1em;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -236,19 +267,22 @@ if data is not None:
     with st.sidebar:
         st.title("Flight Fare Prediction")
         st.markdown("Explore flight data and predict fares.")
-        page = st.radio("Choose a section:", ["Data Overview", "Prediction", "Visualizations", "Model Evaluation"])
+        page = st.radio("Choose a section:", ["Prediction", "Data Exploration", "Model Evaluation"])
 
     # --- Main App Content ---
     st.title("✈️ Flight Fare Prediction App")
 
-    if page == "Data Overview":
-        st.header("Data Overview")
-        st.dataframe(data.head(10))  # Show first 10 rows
-        st.write(f"Number of rows: {data.shape[0]}")
-        st.write(f"Number of columns: {data.shape[1]}")
+    if page == "Prediction":
+        st.header("Predict Your Flight Fare")
+        st.markdown("Enter your flight details below to get an estimated fare.")
 
-    elif page == "Prediction":
-        st.header("Flight Fare Prediction")
+        # Info boxes for guidance
+        st.markdown("""
+            <div class="info-box">
+                <h3>Flight Details</h3>
+                <p>Provide information about your desired flight to get an accurate prediction.</p>
+            </div>
+        """, unsafe_allow_html=True)
 
         # Input fields using columns for layout
         col1, col2 = st.columns(2)
@@ -265,6 +299,8 @@ if data is not None:
             dep_minute = st.slider("Departure Minute", min_value=0, max_value=59, value=0, help="Minute of departure")
             arrival_hour = st.slider("Arrival Hour", min_value=0, max_value=23, value=15, help="Hour of arrival")
             arrival_minute = st.slider("Arrival Minute", min_value=0, max_value=59, value=0, help="Minute of arrival")
+
+        st.markdown("<hr>", unsafe_allow_html=True)  # Visual divider
 
         if st.button("Predict Fare"):
             # Prepare input data
@@ -298,8 +334,21 @@ if data is not None:
             predicted_fare = random_forest_model.predict(input_data)[0]
             st.success(f"Predicted Flight Fare: ₹{predicted_fare:.2f}")
 
-    elif page == "Visualizations":
-        st.header("Data Visualizations")
+    elif page == "Data Exploration":
+        st.header("Explore the Flight Data")
+        st.markdown("Dive into the dataset to understand flight patterns and pricing trends.")
+
+        # Info box for data exploration
+        st.markdown("""
+            <div class="info-box">
+                <h3>Data Insights</h3>
+                <p>Explore various visualizations to gain insights into flight prices and related factors.</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Display the dataframe
+        st.subheader("Raw Data")
+        st.dataframe(data.head(10))
 
         # Airline Distribution
         st.subheader("Airline Distribution")
@@ -317,11 +366,21 @@ if data is not None:
         # Price Distribution
         st.subheader("Price Distribution")
         fig_hist, ax_hist = plt.subplots(figsize=(10, 6))
-        sns.histplot(data['Price'], kde=True, ax=ax_hist, color="#2E86C1")
+        sns.histplot(data['Price'], kde=True, ax=ax_hist, color="#39A7FF")
         st.pyplot(fig_hist)
 
     elif page == "Model Evaluation":
-        st.header("Model Evaluation")
+        st.header("Evaluate the Prediction Model")
+        st.markdown("See how well the model performs on unseen data.")
+
+        # Info box for model evaluation
+        st.markdown("""
+            <div class="info-box">
+                <h3>Model Performance</h3>
+                <p>Understand the accuracy and reliability of the flight fare prediction model.</p>
+            </div>
+        """, unsafe_allow_html=True)
+
         y_pred = random_forest_model.predict(X_test)
         mse = mean_squared_error(y_test, y_pred)
         r2 = r2_score(y_test, y_pred)
@@ -335,7 +394,7 @@ if data is not None:
         st.subheader("Feature Importance")
         feature_importance = pd.Series(random_forest_model.feature_importances_, index=X.columns).sort_values(ascending=False)
         fig_feature_importance, ax_feature_importance = plt.subplots(figsize=(10, 6))
-        feature_importance.plot(kind='bar', ax=ax_feature_importance, color="#2E86C1")
+        feature_importance.plot(kind='bar', ax=ax_feature_importance, color="#39A7FF")
         ax_feature_importance.set_title("Feature Importance from Random Forest")
         ax_feature_importance.set_ylabel("Importance Score")
         st.pyplot(fig_feature_importance)
