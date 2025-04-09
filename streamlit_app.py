@@ -267,12 +267,42 @@ if data is not None:
     with st.sidebar:
         st.title("Flight Fare Prediction")
         st.markdown("Explore flight data and predict fares.")
-        page = st.radio("Choose a section:", ["Prediction", "Data Exploration", "Model Evaluation"])
+        page = st.radio("Choose a section:", ["Model Evaluation", "Prediction", "Data Exploration"])  # Changed the order here
 
     # --- Main App Content ---
     st.title("✈️ Flight Fare Prediction App")
 
-    if page == "Prediction":
+    if page == "Model Evaluation":
+        st.header("Evaluate the Prediction Model")
+        st.markdown("See how well the model performs on unseen data.")
+
+        # Info box for model evaluation
+        st.markdown("""
+            <div class="info-box">
+                <h3>Model Performance</h3>
+                <p>Understand the accuracy and reliability of the flight fare prediction model.</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        y_pred = random_forest_model.predict(X_test)
+        mse = mean_squared_error(y_test, y_pred)
+        r2 = r2_score(y_test, y_pred)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Mean Squared Error", f"{mse:.2f}")
+        with col2:
+            st.metric("R^2 Score", f"{r2:.2f}")
+
+        st.subheader("Feature Importance")
+        feature_importance = pd.Series(random_forest_model.feature_importances_, index=X.columns).sort_values(ascending=False)
+        fig_feature_importance, ax_feature_importance = plt.subplots(figsize=(10, 6))
+        feature_importance.plot(kind='bar', ax=ax_feature_importance, color="#39A7FF")
+        ax_feature_importance.set_title("Feature Importance from Random Forest")
+        ax_feature_importance.set_ylabel("Importance Score")
+        st.pyplot(fig_feature_importance)
+
+    elif page == "Prediction":
         st.header("Predict Your Flight Fare")
         st.markdown("Enter your flight details below to get an estimated fare.")
 
@@ -451,39 +481,8 @@ if data is not None:
         ax_boxplot_airline.set_xlabel("Airline ", fontsize=12)
         ax_boxplot_airline.set_ylabel("Price", fontsize=12)
         ax_boxplot_airline.tick_params(axis='x', rotation=90)
-        ax_boxplot_airline.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
         fig_boxplot_airline.tight_layout()
         st.pyplot(fig_boxplot_airline)
-
-    elif page == "Model Evaluation":
-        st.header("Evaluate the Prediction Model")
-        st.markdown("See how well the model performs on unseen data.")
-
-        # Info box for model evaluation
-        st.markdown("""
-            <div class="info-box">
-                <h3>Model Performance</h3>
-                <p>Understand the accuracy and reliability of the flight fare prediction model.</p>
-            </div>
-        """, unsafe_allow_html=True)
-
-        y_pred = random_forest_model.predict(X_test)
-        mse = mean_squared_error(y_test, y_pred)
-        r2 = r2_score(y_test, y_pred)
-
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Mean Squared Error", f"{mse:.2f}")
-        with col2:
-            st.metric("R^2 Score", f"{r2:.2f}")
-
-        st.subheader("Feature Importance")
-        feature_importance = pd.Series(random_forest_model.feature_importances_, index=X.columns).sort_values(ascending=False)
-        fig_feature_importance, ax_feature_importance = plt.subplots(figsize=(10, 6))
-        feature_importance.plot(kind='bar', ax=ax_feature_importance, color="#39A7FF")
-        ax_feature_importance.set_title("Feature Importance from Random Forest")
-        ax_feature_importance.set_ylabel("Importance Score")
-        st.pyplot(fig_feature_importance)
 
 else:
     st.error("Failed to load data. Check the GitHub URL and your internet connection.")
