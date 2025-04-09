@@ -61,7 +61,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("✈️ Flight Fare Prediction App")
+st.title("✈️ Flight Fare Prediction App22")
 
 if data is not None:
     # --- Data Cleaning and Conversion ---
