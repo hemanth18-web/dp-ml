@@ -121,6 +121,9 @@ if data is not None:
     data['Duration_minutes'] = data['Duration'].apply(convert_duration_to_minutes)
     data.drop('Duration', axis=1, inplace=True, errors='ignore')
 
+    # **Handle Additional_Info Column**
+    data.drop('Additional_Info', axis=1, inplace=True, errors='ignore')
+
     # --- Feature Engineering and Encoding ---
 
     # Convert categorical features to numerical
@@ -136,6 +139,18 @@ if data is not None:
     # --- Data Preparation for Modeling ---
     # Drop any columns with non-finite values (NaN, inf, -inf)
     data = data.dropna(axis=1, how='any')
+
+    # **General Column Check**
+    for col in data.columns:
+        st.write(f"Column: {col}")
+        st.write(f"  Data Type: {data[col].dtype}")
+        st.write(f"  Unique Values: {data[col].nunique()}")
+        #st.write(f"  First 5 Values: {data[col].head().to_list()}") # Print first 5 values
+        try:
+            st.write(f"  Min: {data[col].min()}, Max: {data[col].max()}")
+        except:
+            st.write("  Cannot calculate min/max for this data type.")
+        st.write("-" * 30)
 
     # Ensure all columns are numeric
     for col in data.columns:
