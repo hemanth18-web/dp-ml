@@ -77,13 +77,24 @@ if data is not None:
         data[col] = data[col].astype('category').cat.codes
 
     # Extract date features
-    data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'])
+    data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], errors='coerce') # Handle potential parsing errors
     data['Journey_Day'] = data['Date_of_Journey'].dt.day
     data['Journey_Month'] = data['Date_of_Journey'].dt.month
     data.drop('Date_of_Journey', axis=1, inplace=True)
 
     # --- Data Preparation for Modeling ---
-    X = data.drop(['Price'], axis=1)
+    # Drop any columns with non-finite values (NaN, inf, -inf)
+    data = data.dropna(axis=1, how='any')
+
+    # Ensure all columns are numeric
+    for col in data.columns:
+        try:
+            data[col] = pd.to_numeric(data[col])
+        except ValueError:
+            st.error(f"Could not convert column '{col}' to numeric.  Please investigate.")
+            st.stop()  # Stop execution if a column cannot be converted
+
+    X = data.drop(['Price'], axis=1, errors='ignore') # Ignore if 'Price' is already dropped
     y = data['Price']
 
     # Split data into training and testing sets
@@ -115,10 +126,11 @@ if data is not None:
     st.header("Flight Fare Prediction")
 
     # Input fields
-    source = st.selectbox("Source", options=data['Source'].unique())
-    destination = st.selectbox("Destination", options=data['Destination'].unique())
+    # Ensure that the options passed to selectbox are from the training data
+    source = st.selectbox("Source", options=X_train['Source'].unique())
+    destination = st.selectbox("Destination", options=X_train['Destination'].unique())
     stops = st.slider("Number of Stops", min_value=0, max_value=5, value=1)
-    airline = st.selectbox("Airline", options=data['Airline'].unique())
+    airline = st.selectbox("Airline", options=X_train['Airline'].unique())
     dep_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=10)
     dep_minute = st.slider("Departure Minute", min_value=0, max_value=59, value=30)
     arrival_hour = st.slider("Arrival Hour", min_value=0, max_value=23, value=13)
@@ -145,6 +157,13 @@ if data is not None:
             'Journey_Day': [journey_day],
             'Journey_Month': [journey_month]
         })
+
+        # Ensure the input data has the same columns as the training data
+        for col in X_train.columns:
+            if col not in input_data.columns:
+                input_data[col] = 0  # Or some other appropriate default value
+
+        input_data = input_data[X_train.columns]  # Ensure correct column order
 
         # Make prediction
         predicted_fare = random_forest_model.predict(input_data)[0]
