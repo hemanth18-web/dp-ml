@@ -1,9 +1,13 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from datetime import datetime, timedelta
+import holidays
 import matplotlib.pyplot as plt
 import seaborn as sns
-import pickle
+import requests
+import time
+import pickle  # For saving the model
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
@@ -11,38 +15,71 @@ from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.feature_selection import mutual_info_regression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.feature_selection import RFE
+from sklearn.linear_model import LinearRegression
+import xgboost as xgb
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+import numpy as np
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+from xgboost import XGBRegressor
+from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 
+# --- CONFIGURATION ---
+st.set_page_config(
+    page_title="Flight Fare Prediction App",
+    page_icon="✈️",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-
-# --- Load Data ---
-@st.cache_data  # Cache the data to avoid reloading on every interaction
+# --- LOAD DATA ---
+@st.cache_data  # Use st.cache_data for improved caching
 def load_data(file_path):
-    try:
-        data = pd.read_excel(file_path, engine='openpyxl')
-        return data
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
-        return None
+    data = pd.read_excel(file_path, engine='openpyxl')
+    return data
 
-# --- Data Preprocessing ---
+file_path = 'Data_Train (3).xlsx'  # Or replace with your GitHub loading method
+data = load_data(file_path)
+
+# --- DATA PREPROCESSING ---
 def preprocess_data(data):
-    # Cabin Class (Random Assignment - Replace with actual logic if available)
+    # Cabin Class (Randomly assigned for demonstration)
     cabin_classes = ['Economy', 'Business', 'First Class']
     data['Cabin_Class'] = np.random.choice(cabin_classes, size=len(data))
 
-    # Number of Stops and Flight Layover
+    # Flight Layover
     def get_layover(route):
         stops = route.count('→')
         return stops, "Direct" if stops == 0 else f"{stops} Stop(s)"
 
     data[['Number_of_Stops', 'Flight_Layover']] = data['Route'].astype(str).apply(lambda x: pd.Series(get_layover(x)))
 
-    # Date Conversions
+    # Date Features
     data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], format='%d/%m/%Y')
     data['Booking_Date'] = data['Date_of_Journey'] - pd.to_timedelta(np.random.randint(1, 60, size=len(data)), unit='D')
     data['Days_Until_Departure'] = (data['Date_of_Journey'] - data['Booking_Date']).dt.days
 
-    # Fuel Price (Random Generation - Replace with actual data if available)
+    # Holiday Season (Using a simplified approach for demonstration)
+    # In a real app, you'd fetch this data from an API or a pre-calculated source
+    holiday_dates = pd.to_datetime(['2019-01-01', '2019-01-26', '2019-08-15', '2019-12-25'])  # Example holidays
+    data['Is_Holiday_Season'] = data['Date_of_Journey'].isin(holiday_dates).astype(int)
+
+    # Peak Season
+    def is_peak_season(row):
+        peak_months = [12, 1, 2, 3, 4]
+        if row['Date_of_Journey'] in holiday_dates or row['Date_of_Journey'].month in peak_months:
+            return 1
+        return 0
+
+    data['Is_Peak_Season'] = data.apply(is_peak_season, axis=1)
+
+    # Fuel Price (Randomly generated for demonstration)
+    np.random.seed(42)
     fuel_price_data = pd.DataFrame({
         'Date': pd.date_range(start='2019-01-01', periods=365, freq='D'),
         'Fuel_Price_INR': np.random.uniform(60000, 90000, size=365)
@@ -52,34 +89,61 @@ def preprocess_data(data):
     data.rename(columns={'Fuel_Price_INR': 'ATF_Price_INR'}, inplace=True)
     data.drop(columns=['Date'], inplace=True)
 
-    # Extract Date Features
+    return data
+
+data = preprocess_data(data)
+
+# --- FEATURE ENGINEERING ---
+def feature_engineering(data):
+    # Extract date features
     data['Day'] = data['Date_of_Journey'].dt.day
     data['Month'] = data['Date_of_Journey'].dt.month
     data['Year'] = data['Date_of_Journey'].dt.year
+    data.drop("Date_of_Journey", inplace=True, axis=1)
 
-    # Extract Time Features
-    data['Dep_Time'] = pd.to_datetime(data['Dep_Time'])
-    data['Dep_Hour'] = data['Dep_Time'].dt.hour
-    data['Dep_Minute'] = data['Dep_Time'].dt.minute
+    # Extract hour and minute from time features
+    def extract_hour_min(data, col):
+        data[col] = pd.to_datetime(data[col], errors='coerce')  # Handle potential errors
+        data[col + "_hour"] = data[col].dt.hour
+        data[col + "_minute"] = data[col].dt.minute
+        return data
 
-    data['Arrival_Time'] = pd.to_datetime(data['Arrival_Time'])
-    data['Arrival_Hour'] = data['Arrival_Time'].dt.hour
-    data['Arrival_Minute'] = data['Arrival_Time'].dt.minute
+    data = extract_hour_min(data, "Dep_Time")
+    data = extract_hour_min(data, "Arrival_Time")
+    cols_to_drop = ['Arrival_Time', 'Dep_Time']
+    data.drop(cols_to_drop, axis=1, inplace=True)
 
-    # Duration
-    def preprocess_duration(x):
+    # Departure time categorization
+    def flight_dep_time(x):
+        if (x > 4) and (x <= 8):
+            return "Early Morning"
+        elif (x > 8) and (x <= 12):
+            return "Morning"
+        elif (x > 12) and (x <= 16):
+            return "Noon"
+        elif (x > 16) and (x <= 20):
+            return "Evening"
+        elif (x > 20) and (x <= 24):
+            return "Night"
+        else:
+            return "late night"
+
+    data['Dep_Time_hour_category'] = data['Dep_Time_hour'].apply(flight_dep_time)
+
+    # Duration processing
+    def prepocess_duration(x):
         if 'h' not in x:
             x = '0h ' + x
         elif 'm' not in x:
             x = x + ' 0m'
         return x
 
-    data['Duration'] = data['Duration'].astype(str).apply(preprocess_duration)
+    data['Duration'] = data['Duration'].astype(str).apply(prepocess_duration)
     data['Duration_hours'] = data['Duration'].str.split(' ').str[0].str.replace('h', '').astype(int)
     data['Duration_minutes'] = data['Duration'].str.split(' ').str[1].str.replace('m', '').astype(int)
     data['Duration_total_mins'] = data['Duration'].str.replace('h', "*60").str.replace(' ', '+').str.replace('m', "*1").apply(eval)
 
-    # Categorical Encoding
+    # Categorical encoding
     airlines = data.groupby(['Airline'])['Price'].mean().sort_values().index
     dict_airlines = {key: index for index, key in enumerate(airlines, 0)}
     data['Airline'] = data['Airline'].map(dict_airlines)
@@ -93,24 +157,46 @@ def preprocess_data(data):
     dict_Total_Stops = {key: index for index, key in enumerate(Total_Stops, 0)}
     data['Total_Stops'] = data['Total_Stops'].map(dict_Total_Stops)
 
+    data.drop(columns=['Additional_Info', 'Source', 'Route', 'Duration', 'Flight_Layover'], axis=1, inplace=True)
+
     Cabin_Class = data['Cabin_Class'].unique()
     dict_Cabin_Class = {key: index for index, key in enumerate(Cabin_Class, 0)}
     data['Cabin_Class'] = data['Cabin_Class'].map(dict_Cabin_Class)
 
-    # Drop Unnecessary Columns
-    cols_to_drop = ['Date_of_Journey', 'Dep_Time', 'Arrival_Time', 'Additional_Info', 'Source', 'Route', 'Duration', 'Flight_Layover']
-    data.drop(columns=cols_to_drop, axis=1, inplace=True)
-
     return data
 
-# --- Model Training and Prediction ---
-def train_and_predict(data, model_name):
+data = feature_engineering(data)
+
+# --- FEATURE SELECTION ---
+def feature_selection(data):
     X = data.drop(['Price'], axis=1)
     y = data['Price']
 
     # Convert 'Booking_Date' to ordinal
-    X['Booking_Date'] = pd.to_datetime(X['Booking_Date']).apply(lambda date: date.toordinal())
+    X['Booking_Date'] = pd.to_datetime(X['Booking_Date'])
+    X['Booking_Date'] = X['Booking_Date'].apply(lambda date: date.toordinal())
 
+    # Mutual Information
+    mi = mutual_info_regression(X, y)
+    mi_series = pd.Series(mi, index=X.columns).sort_values(ascending=False)
+
+    # RFE
+    model = LinearRegression()
+    rfe = RFE(model, n_features_to_select=3)
+    rfe.fit(X, y)
+    selected_features_rfe = X.columns[rfe.support_]
+
+    # Random Forest
+    random_forest_model = RandomForestRegressor(n_estimators=100, random_state=42)
+    random_forest_model.fit(X, y)
+    feature_importance = pd.Series(random_forest_model.feature_importances_, index=X.columns).sort_values(ascending=False)
+
+    return X, y, mi_series, selected_features_rfe, feature_importance
+
+X, y, mi_series, selected_features_rfe, feature_importance = feature_selection(data)
+
+# --- MODEL TRAINING AND EVALUATION ---
+def train_and_evaluate(X, y):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=100)
 
     models = {
@@ -121,72 +207,172 @@ def train_and_predict(data, model_name):
         "Gradient Boosting": GradientBoostingRegressor()
     }
 
-    model = models[model_name]
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
+    metrics = {"MSE": [], "MAE": [], "R2": [], "RMSE": [], "MAPE": []}
+    model_names = []
 
-    r2 = r2_score(y_test, y_pred)
-    mae = mean_absolute_error(y_test, y_pred)
-    mse = mean_squared_error(y_test, y_pred)
-    rmse = np.sqrt(mse)
-    mape = np.mean(np.abs((y_test - y_pred) / y_test)) * 100
+    for name, model in models.items():
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_test)
 
-    return r2, mae, mse, rmse, mape, model
+        r2 = r2_score(y_test, y_pred)
+        mae = mean_absolute_error(y_test, y_pred)
+        mse = mean_squared_error(y_test, y_pred)
+        rmse = np.sqrt(mse)
+        mape = np.mean(np.abs((y_test - y_pred) / y_test)) * 100
 
-# --- Visualization Functions ---
-def plot_price_distribution(data):
-    fig, ax = plt.subplots(figsize=(8, 6))
-    sns.histplot(data['Price'], kde=True, ax=ax)
-    ax.set_title('Price Distribution')
-    st.pyplot(fig)
+        metrics["MSE"].append(mse)
+        metrics["MAE"].append(mae)
+        metrics["R2"].append(r2)
+        metrics["RMSE"].append(rmse)
+        metrics["MAPE"].append(mape)
+        model_names.append(name)
 
-def plot_feature_importance(model, features):
-    if hasattr(model, 'feature_importances_'):
-        fig, ax = plt.subplots(figsize=(8, 6))
-        importances = pd.Series(model.feature_importances_, index=features.columns)
-        importances.sort_values().plot(kind='barh', ax=ax)
-        ax.set_title('Feature Importance')
-        st.pyplot(fig)
+    df_metrics = pd.DataFrame(metrics, index=model_names)
+    return df_metrics, X_train, X_test, y_train, y_test, models
+
+df_metrics, X_train, X_test, y_train, y_test, models = train_and_evaluate(X, y)
+
+# --- STREAMLIT UI ---
+st.title("✈️ Flight Fare Prediction")
+
+# Sidebar
+with st.sidebar:
+    st.header("About")
+    st.info("This app predicts flight fares using various machine learning models.")
+
+    st.subheader("Data Information")
+    st.write(f"Number of rows: {data.shape[0]}")
+    st.write(f"Number of columns: {data.shape[1]}")
+
+    if st.checkbox("Show raw data"):
+        st.subheader("Raw data")
+        st.dataframe(data)
+
+# Data Exploration Section
+st.header("📊 Data Exploration")
+
+# Display basic statistics
+st.subheader("Descriptive Statistics")
+st.dataframe(data.describe())
+
+# Display correlation matrix
+st.subheader("Correlation Matrix")
+fig_corr, ax_corr = plt.subplots()
+sns.heatmap(data.corr(numeric_only=True), annot=False, cmap="coolwarm", fmt=".2f", linewidths=0.5, ax=ax_corr)
+st.pyplot(fig_corr)
+
+# Display value counts for categorical columns
+st.subheader("Value Counts for Categorical Columns")
+categorical_cols = data.select_dtypes(include=['object']).columns
+for col in categorical_cols:
+    st.write(f"**{col}**")
+    st.dataframe(data[col].value_counts())
+
+# Feature Selection Results
+st.header("✨ Feature Selection")
+
+st.subheader("Mutual Information")
+st.dataframe(mi_series.head(10))
+
+st.subheader("RFE Selected Features")
+st.write(selected_features_rfe)
+
+st.subheader("Random Forest Feature Importance")
+st.dataframe(feature_importance.head(10))
+
+# Model Evaluation Section
+st.header("🤖 Model Evaluation")
+
+st.subheader("Model Performance Metrics")
+st.dataframe(df_metrics)
+
+# Model Selection
+st.subheader("Select a Model for Prediction")
+selected_model_name = st.selectbox("Choose a model", list(models.keys()))
+selected_model = models[selected_model_name]
+
+# Prediction Input Form
+st.subheader("Enter Flight Details for Prediction")
+
+# Create input fields for all features used in the model
+input_data = {}
+for col in X_train.columns:
+    if X_train[col].dtype == 'int64' or X_train[col].dtype == 'float64':
+        input_data[col] = st.number_input(f"{col} ({X_train[col].dtype})", value=X_train[col].mean())
+    elif X_train[col].dtype == 'datetime64[ns]':
+        input_data[col] = st.date_input(f"{col}", value=X_train[col].min().date())
     else:
-        st.write("Feature importance not available for this model.")
+        input_data[col] = st.text_input(f"{col} (text)", value="Example")
 
-# --- Streamlit App ---
-def main():
-    st.title("Flight Fare Prediction App2")
+# Convert input data to DataFrame
+input_df = pd.DataFrame([input_data], columns=X_train.columns)
 
-    # File Upload
-    file_path = st.file_uploader("Upload Flight Data (Excel file)", type=["xlsx"])
+# Convert 'Booking_Date' to ordinal if it exists in the input
+if 'Booking_Date' in input_df.columns:
+    input_df['Booking_Date'] = pd.to_datetime(input_df['Booking_Date']).apply(lambda date: date.toordinal())
 
-    if file_path is not None:
-        data = load_data(file_path)
+# Make Prediction
+if st.button("Predict Fare"):
+    prediction = selected_model.predict(input_df)
+    st.success(f"Predicted Flight Fare: ₹{prediction[0]:.2f}")
 
-        if data is not None:
-            st.subheader("Data Preview")
-            st.dataframe(data.head())
+# --- VISUALIZATIONS ---
+st.header("📊 Visualizations")
 
-            # Preprocess Data
-            data = preprocess_data(data.copy())  # Use a copy to avoid modifying the original
+# Price vs Number of Stops
+st.subheader("Price vs Number of Stops")
+fig_scatter, ax_scatter = plt.subplots()
+ax_scatter.scatter(data['Price'], data['Number_of_Stops'], s=80, alpha=0.7, c=data['Price'], cmap='viridis', edgecolors='black')
+ax_scatter.set_xlabel('Price')
+ax_scatter.set_ylabel('Number of Stops')
+st.pyplot(fig_scatter)
 
-            # Model Selection
-            model_name = st.selectbox("Select a Model", [
-                "Linear Regression", "Decision Tree", "Random Forest", "XGBoost", "Gradient Boosting"
-            ])
+# Airline Distribution
+st.subheader("Airline Distribution")
+fig_countplot, ax_countplot = plt.subplots()
+sns.countplot(x="Airline", data=data, hue="Airline", palette="muted", legend=False, ax=ax_countplot)
+plt.xticks(rotation=90, fontsize=8)
+st.pyplot(fig_countplot)
 
-            if st.button("Train and Predict"):
-                with st.spinner(f"Training {model_name}..."):
-                    r2, mae, mse, rmse, mape, model = train_and_predict(data, model_name)
+# Ticket Price Trends Over Time
+st.subheader("Ticket Price Trends Over Time")
+fig_lineplot, ax_lineplot = plt.subplots()
+sns.lineplot(x="Booking_Date", y="Price", data=data, hue="Airline", marker="o", palette="viridis", ax=ax_lineplot)
+plt.xticks(rotation=90)
+st.pyplot(fig_lineplot)
 
-                st.subheader("Model Performance")
-                st.write(f"R² Score: {r2:.4f}")
-                st.write(f"Mean Absolute Error: {mae:.2f}")
-                st.write(f"Mean Squared Error: {mse:.2f}")
-                st.write(f"Root Mean Squared Error: {rmse:.2f}")
-                st.write(f"Mean Absolute Percentage Error: {mape:.2f}%")
+# Days Until Departure
+st.subheader("Days Until Departure")
+days_count = data['Days_Until_Departure'].value_counts().sort_index()
+fig_days, ax_days = plt.subplots()
+ax_days.plot(days_count.index, days_count.values, marker='o', color='skyblue', linewidth=2)
+ax_days.set_xlabel('Days Until Departure')
+ax_days.set_ylabel('Count')
+st.pyplot(fig_days)
 
-                # Visualizations
-                st.subheader("Visualizations")
-                plot_price_distribution(data)
-                plot_feature_importance(model, data.drop(['Price'], axis=1))
+# Price Distribution by Cabin Class
+st.subheader("Price Distribution by Cabin Class")
+fig_boxplot, ax_boxplot = plt.subplots()
+sns.boxplot(x="Cabin_Class", y="Price", data=data, palette="Set2", hue="Cabin_Class", ax=ax_boxplot)
+st.pyplot(fig_boxplot)
 
-if __name__ == "__main__":
-    main()
+# Price Distribution by Airline
+st.subheader("Price Distribution by Airline")
+fig_airline_box, ax_airline_box = plt.subplots()
+sns.boxplot(x="Airline", y="Price", data=data.sort_values('Price', ascending=False), hue="Airline", palette="Set2", ax=ax_airline_box)
+plt.xticks(rotation=90)
+st.pyplot(fig_airline_box)
+
+# Top 10 Most Used Routes
+st.subheader("Top 10 Most Used Routes")
+most_used_routes = data["Route"].value_counts().sort_values(ascending=False)[:10]
+fig_routes, ax_routes = plt.subplots()
+sns.barplot(x=most_used_routes.index, y=most_used_routes.values, palette="Blues", hue=most_used_routes.index, ax=ax_routes)
+plt.xticks(rotation=90)
+st.pyplot(fig_routes)
+
+# Impact of Aviation Fuel Prices on Flight Ticket Prices
+st.subheader("Impact of Aviation Fuel Prices on Flight Ticket Prices")
+fig_fuel, ax_fuel = plt.subplots()
+sns.regplot(x="ATF_Price_INR", y="Price", data=data, color="#3498db", scatter_kws={"s": 100, "facecolors": "white", "edgecolor": "#3498db", "alpha": 0.75}, line_kws={"color": "#e74c3c", "linewidth": 3}, ax=ax_fuel)
+st.pyplot(fig_fuel)
