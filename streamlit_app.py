@@ -32,14 +32,19 @@ def load_data_from_github(url):
 data = load_data_from_github(github_url)
 
 # --- STREAMLIT APP ---
-st.title("Flight Fare Data Exploration2")
+st.title("Flight Fare Data Exploration")
 
 if data is not None:
     # --- Data Cleaning and Conversion ---
-    # Handle missing values and convert 'Total_Stops' to numeric
+    # Replace "non-stop" with 0
+    data['Total_Stops'] = data['Total_Stops'].replace("non-stop", 0)
+
+    # Handle missing values (NaN)
     data['Total_Stops'] = data['Total_Stops'].replace('NaN', np.nan)  # Replace string 'NaN' with actual NaN
     data['Total_Stops'] = data['Total_Stops'].fillna(0)  # Fill NaN with 0 (or another appropriate value)
-    data['Total_Stops'] = pd.to_numeric(data['Total_Stops'])  # Convert to numeric
+
+    # Convert 'Total_Stops' to numeric
+    data['Total_Stops'] = pd.to_numeric(data['Total_Stops'])
 
     st.header("Data Preview")
     st.dataframe(data.head())
