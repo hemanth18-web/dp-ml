@@ -9,6 +9,7 @@ import re  # Import the regular expression module
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
+from datetime import datetime
 
 # GitHub URL for the dataset
 github_url = "https://raw.githubusercontent.com/hemanth18-web/dp-ml/refs/heads/main/Updated_Flight_Fare_Data%20(20).csv"
@@ -50,92 +51,125 @@ st.set_page_config(page_title="Flight Fare Predictor", page_icon="✈️", layou
 # Custom CSS for styling
 st.markdown("""
     <style>
-    .big-font {
-        font-size:24px !important;
-        font-weight: bold;
+    /* General styling */
+    body {
+        font-family: 'Helvetica Neue', sans-serif;
+        color: #333;
+        background-color: #f9f9f9;
     }
-    .medium-font {
-        font-size:18px !important;
+    .stApp {
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 20px;
     }
-    .stSlider>div>div>div>div {
-        background-color: #FF4B4B; /* Change slider color */
+    /* Header styling */
+    h1 {
+        color: #2E86C1;
+        text-align: center;
+        margin-bottom: 30px;
     }
-    div.stButton > button:first-child {
-        background-color: #FF4B4B;
+    /* Sidebar styling */
+    .stSidebar {
+        background-color: #EBF5FB;
+        padding: 20px;
+        border-radius: 10px;
+    }
+    .stSidebar h2 {
+        color: #2E86C1;
+        margin-bottom: 20px;
+    }
+    /* Input elements styling */
+    .stSelectbox, .stSlider, .stDateInput {
+        margin-bottom: 20px;
+    }
+    /* Button styling */
+    .stButton > button {
+        background-color: #2E86C1;
         color: white;
-        font-size: 20px;
-        padding: 10px 24px;
-        border-radius: 8px;
+        font-size: 16px;
+        padding: 10px 20px;
+        border-radius: 5px;
+        border: none;
+        cursor: pointer;
+        transition: background-color 0.3s;
     }
-    div.stSelectbox > label {
-        font-size: 18px;
+    .stButton > button:hover {
+        background-color: #1A5276;
     }
-    div.stDataFrame {
+    /* Dataframe styling */
+    .stDataFrame {
         border: 1px solid #ddd;
         border-radius: 5px;
         padding: 10px;
+        background-color: white;
+    }
+    /* Metric styling */
+    .stMetric {
+        background-color: white;
+        border-radius: 5px;
+        padding: 20px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+    }
+    .stMetric label {
+        font-weight: bold;
+        color: #555;
+    }
+    .stMetric > div:nth-child(2) {
+        font-size: 24px;
+        color: #2E86C1;
+    }
+    /* Visualization styling */
+    .stPlot {
+        background-color: white;
+        border-radius: 5px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Sidebar for navigation
-with st.sidebar:
-    st.title("Navigation")
-    page = st.radio("Go to", ["Data Overview", "Model Training & Evaluation", "Prediction", "Visualizations"])
-
-st.title("✈️ Flight Fare Prediction App")
-
+# --- DATA PREPROCESSING (Move this outside the conditional page logic) ---
 if data is not None:
     # --- Data Cleaning and Conversion ---
-    # Replace "non-stop" with 0
     data['Total_Stops'] = data['Total_Stops'].replace("non-stop", 0)
-    # Handle missing values (NaN)
-    data['Total_Stops'] = data['Total_Stops'].replace('NaN', np.nan)  # Replace string 'NaN' with actual NaN
-    data['Total_Stops'] = data['Total_Stops'].fillna(0)  # Fill NaN with 0 (or another appropriate value)
-    # **Correctly Handle Non-Numeric Values in Total_Stops**
+    data['Total_Stops'] = data['Total_Stops'].replace('NaN', np.nan)
+    data['Total_Stops'] = data['Total_Stops'].fillna(0)
+
     def convert_stops_to_numeric(stops):
-        if isinstance(stops, (int, float)):  # Check if already numeric
+        if isinstance(stops, (int, float)):
             return stops
         elif isinstance(stops, str) and '→' in stops:
-            return len(stops.split('→'))  # Count the number of stops based on '→'
+            return len(stops.split('→'))
         else:
-            return 0  # Default to 0 for unknown values
-    data['Total_Stops'] = data['Total_Stops'].astype(str).apply(convert_stops_to_numeric) # Convert to string first to handle mixed types
-    # Convert 'Total_Stops' to numeric *after* cleaning
+            return 0
+    data['Total_Stops'] = data['Total_Stops'].astype(str).apply(convert_stops_to_numeric)
     data['Total_Stops'] = pd.to_numeric(data['Total_Stops'], errors='coerce').fillna(0)
-    # **Handle Dep_Time Column**
+
     try:
-        # Attempt to convert 'Dep_Time' to datetime objects
         data['Dep_Time'] = pd.to_datetime(data['Dep_Time'], errors='coerce')
-        # Extract hour and minute
         data['Dep_Time_hour'] = data['Dep_Time'].dt.hour
         data['Dep_Time_minute'] = data['Dep_Time'].dt.minute
-        # Drop the original 'Dep_Time' column
-        data.drop('Dep_Time', axis=1, inplace=True, errors='ignore')  # Use errors='ignore'
+        data.drop('Dep_Time', axis=1, inplace=True, errors='ignore')
     except Exception as e:
         st.error(f"Error processing 'Dep_Time' column: {e}")
-    # **Handle Arrival_Time Column**
+
     try:
-        # Attempt to convert 'Arrival_Time' to datetime objects
         data['Arrival_Time'] = pd.to_datetime(data['Arrival_Time'], errors='coerce')
-        # Extract hour and minute
         data['Arrival_Time_hour'] = data['Arrival_Time'].dt.hour
         data['Arrival_Time_minute'] = data['Arrival_Time'].dt.minute
-        # Drop the original 'Arrival_Time' column
-        data.drop('Arrival_Time', axis=1, inplace=True, errors='ignore')  # Use errors='ignore'
+        data.drop('Arrival_Time', axis=1, inplace=True, errors='ignore')
     except Exception as e:
         st.error(f"Error processing 'Arrival_Time' column: {e}")
-    # **Handle Duration Column**
+
     def convert_duration_to_minutes(duration):
         try:
-            # Use regular expression to extract hours and minutes
-            match = re.match(r'(\d+)h\s*(\d+)m', str(duration))  # Added str() conversion
+            match = re.match(r'(\d+)h\s*(\d+)m', str(duration))
             if match:
                 hours = int(match.group(1))
                 minutes = int(match.group(2))
                 return hours * 60 + minutes
             else:
-                # Handle cases where only hours or minutes are present
                 match_hours = re.match(r'(\d+)h', str(duration))
                 match_minutes = re.match(r'(\d+)m', str(duration))
                 if match_hours:
@@ -145,95 +179,103 @@ if data is not None:
                     minutes = int(match_minutes.group(1))
                     return minutes
                 else:
-                    return 0  # Default to 0 if no match
+                    return 0
         except:
-            return 0  # Handle any unexpected errors
+            return 0
     data['Duration_minutes'] = data['Duration'].apply(convert_duration_to_minutes)
     data.drop('Duration', axis=1, inplace=True, errors='ignore')
-    # **Handle Additional_Info Column**
+
     data.drop('Additional_Info', axis=1, inplace=True, errors='ignore')
-    # **Handle Cabin_Class Column**
     data['Cabin_Class'] = data['Cabin_Class'].astype('category').cat.codes
-    # **Handle Flight_Layover Column**
     data['Flight_Layover'] = data['Flight_Layover'].astype('category').cat.codes
-    # **Handle Booking_Date Column**
+
     try:
         data['Booking_Date'] = pd.to_datetime(data['Booking_Date'], errors='coerce')
         data['Booking_Day'] = data['Booking_Date'].dt.day
         data['Booking_Month'] = data['Booking_Date'].dt.month
-        data['Booking_Year'] = data['Booking_Date'].dt.year  # Extract year as well
+        data['Booking_Year'] = data['Booking_Date'].dt.year
         data.drop('Booking_Date', axis=1, inplace=True, errors='ignore')
     except Exception as e:
         st.error(f"Error processing 'Booking_Date' column: {e}")
-    # --- Feature Engineering and Encoding ---
-    # Store original values for mapping in prediction
+
     airline_mapping = dict(enumerate(data['Airline'].astype('category').cat.categories))
     source_mapping = dict(enumerate(data['Source'].astype('category').cat.categories))
     destination_mapping = dict(enumerate(data['Destination'].astype('category').cat.categories))
-    # Convert categorical features to numerical
+
     for col in ['Airline', 'Source', 'Destination']:
         data[col] = data[col].astype('category').cat.codes
-    # Extract date features
-    data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], errors='coerce') # Handle potential parsing errors
+
+    data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], errors='coerce')
     data['Journey_Day'] = data['Date_of_Journey'].dt.day
     data['Journey_Month'] = data['Date_of_Journey'].dt.month
-    #data.drop('Date_of_Journey', axis=1, inplace=True)
-    # --- Data Preparation for Modeling ---
-    # Drop any columns with non-finite values (NaN, inf, -inf)
+
     data = data.dropna(axis=1, how='any')
-    # Ensure all columns are numeric
+
     for col in data.columns:
         try:
             data[col] = pd.to_numeric(data[col])
         except ValueError:
             st.error(f"Could not convert column '{col}' to numeric.  Please investigate.")
-            st.stop()  # Stop execution if a column cannot be converted
-    X = data.drop(['Price'], axis=1, errors='ignore') # Ignore if 'Price' is already dropped
+            st.stop()
+
+    X = data.drop(['Price'], axis=1, errors='ignore')
     y = data['Price']
-    # Split data into training and testing sets
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    # --- Model Training ---
-    if page == "Model Training & Evaluation":
-        st.header("Random Forest Model Training")
-        random_forest_model = RandomForestRegressor(n_estimators=100, random_state=42)
-        random_forest_model.fit(X_train, y_train)
-        # --- Model Evaluation ---
-        y_pred = random_forest_model.predict(X_test)
-        mse = mean_squared_error(y_test, y_pred)
-        r2 = r2_score(y_test, y_pred)
-        st.write(f"Mean Squared Error: {mse:.2f}")
-        st.write(f"R^2 Score: {r2:.2f}")
-        # --- Feature Importance Plot ---
-        st.subheader("Feature Importance")
-        feature_importance = pd.Series(random_forest_model.feature_importances_, index=X.columns).sort_values(ascending=False)
-        fig_feature_importance, ax_feature_importance = plt.subplots(figsize=(10, 6))
-        feature_importance.plot(kind='bar', ax=ax_feature_importance)
-        ax_feature_importance.set_title("Feature Importance from Random Forest")
-        ax_feature_importance.set_ylabel("Importance Score")
-        st.pyplot(fig_feature_importance)
-    # --- Prediction Interface ---
-    if page == "Prediction":
+
+    # --- Model Training (Train the model *once* outside the prediction) ---
+    @st.cache_resource  # Use cache_resource for models
+    def train_model(X_train, y_train):
+        model = RandomForestRegressor(n_estimators=100, random_state=42)
+        model.fit(X_train, y_train)
+        return model
+
+    random_forest_model = train_model(X_train, y_train)  # Train the model
+
+    # --- Sidebar for navigation ---
+    with st.sidebar:
+        st.title("Flight Fare Prediction")
+        st.markdown("Explore flight data and predict fares.")
+        page = st.radio("Choose a section:", ["Data Overview", "Prediction", "Visualizations", "Model Evaluation"])
+
+    # --- Main App Content ---
+    st.title("✈️ Flight Fare Prediction App")
+
+    if page == "Data Overview":
+        st.header("Data Overview")
+        st.dataframe(data.head(10))  # Show first 10 rows
+        st.write(f"Number of rows: {data.shape[0]}")
+        st.write(f"Number of columns: {data.shape[1]}")
+
+    elif page == "Prediction":
         st.header("Flight Fare Prediction")
-        # Input fields
+
+        # Input fields using columns for layout
         col1, col2 = st.columns(2)
         with col1:
-            source = st.selectbox("Source", options=list(source_mapping.values()))
-            destination = st.selectbox("Destination", options=list(destination_mapping.values()))
-            airline = st.selectbox("Airline", options=list(airline_mapping.values()))
-            stops = st.slider("Number of Stops", min_value=0, max_value=5, value=1)
+            source = st.selectbox("Source", options=list(source_mapping.values()), help="Select the origin city")
+            destination = st.selectbox("Destination", options=list(destination_mapping.values()), help="Select the destination city")
+            airline = st.selectbox("Airline", options=list(airline_mapping.values()), help="Select the airline")
+            stops = st.slider("Number of Stops", min_value=0, max_value=5, value=0, help="Number of layovers")
+
         with col2:
-            dep_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=10)
-            dep_minute = st.slider("Departure Minute", min_value=0, max_value=59, value=30)
-            arrival_hour = st.slider("Arrival Hour", min_value=0, max_value=23, value=13)
-            arrival_minute = st.slider("Arrival Minute", min_value=0, max_value=59, value=45)
-            journey_day = st.slider("Journey Day", min_value=1, max_value=31, value=15)
-            journey_month = st.slider("Journey Month", min_value=1, max_value=12, value=3)
-        # Prediction button
+            # Use date_input for journey date
+            journey_date = st.date_input("Journey Date", datetime.now(), help="Select the date of travel")
+            dep_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=12, help="Hour of departure")
+            dep_minute = st.slider("Departure Minute", min_value=0, max_value=59, value=0, help="Minute of departure")
+            arrival_hour = st.slider("Arrival Hour", min_value=0, max_value=23, value=15, help="Hour of arrival")
+            arrival_minute = st.slider("Arrival Minute", min_value=0, max_value=59, value=0, help="Minute of arrival")
+
         if st.button("Predict Fare"):
             # Prepare input data
             source_code = [k for k, v in source_mapping.items() if v == source][0]
             destination_code = [k for k, v in destination_mapping.items() if v == destination][0]
             airline_code = [k for k, v in airline_mapping.items() if v == airline][0]
+
+            # Extract day and month from journey_date
+            journey_day = journey_date.day
+            journey_month = journey_date.month
+
             input_data = pd.DataFrame({
                 'Airline': [airline_code],
                 'Source': [source_code],
@@ -246,114 +288,57 @@ if data is not None:
                 'Journey_Day': [journey_day],
                 'Journey_Month': [journey_month]
             })
-            # Ensure the input data has the same columns as the training data
+
             for col in X_train.columns:
                 if col not in input_data.columns:
-                    input_data[col] = 0  # Or some other appropriate default value
-            input_data = input_data[X_train.columns]  # Ensure correct column order
+                    input_data[col] = 0
+            input_data = input_data[X_train.columns]
+
             # Make prediction
-            random_forest_model = RandomForestRegressor(n_estimators=100, random_state=42)
-            random_forest_model.fit(X_train, y_train)
             predicted_fare = random_forest_model.predict(input_data)[0]
             st.success(f"Predicted Flight Fare: ₹{predicted_fare:.2f}")
-    if page == "Data Overview":
-        st.header("Data Preview")
-        st.dataframe(data.head())
-        st.header("Data Summary")
-        st.write(f"Number of rows: {data.shape[0]}")
-        st.write(f"Number of columns: {data.shape[1]}")
-    # --- VISUALIZATIONS ---
-    if page == "Visualizations":
-        st.header("Visualizations")
+
+    elif page == "Visualizations":
+        st.header("Data Visualizations")
+
         # Airline Distribution
         st.subheader("Airline Distribution")
         fig_airline, ax_airline = plt.subplots(figsize=(10, 6))
-        sns.countplot(x="Airline", data=data, ax=ax_airline, palette="muted", order=data['Airline'].value_counts().index)  # Order by frequency
+        sns.countplot(x="Airline", data=data, ax=ax_airline, palette="viridis", order=data['Airline'].value_counts().index)
         ax_airline.tick_params(axis='x', rotation=90)
         st.pyplot(fig_airline)
-        # Price vs. Number of Stops (Scatter Plot)
+
+        # Price vs. Number of Stops
         st.subheader("Price vs. Number of Stops")
         fig_scatter, ax_scatter = plt.subplots(figsize=(10, 6))
-        sns.scatterplot(x="Price", y="Total_Stops", data=data, ax=ax_scatter)
+        sns.scatterplot(x="Price", y="Total_Stops", data=data, ax=ax_scatter, alpha=0.7)
         st.pyplot(fig_scatter)
-        # Price Distribution (Histogram)
+
+        # Price Distribution
         st.subheader("Price Distribution")
         fig_hist, ax_hist = plt.subplots(figsize=(10, 6))
-        sns.histplot(data['Price'], kde=True, ax=ax_hist)
+        sns.histplot(data['Price'], kde=True, ax=ax_hist, color="#2E86C1")
         st.pyplot(fig_hist)
-        # --- ADDED: Scatter plot with customized aesthetics ---
-        st.header("Price vs Number of Stops (Customized)")
-        fig_scatter_custom, ax_scatter_custom = plt.subplots(figsize=(10, 6))
-        scatter = ax_scatter_custom.scatter(data['Price'], data['Total_Stops'], s=80, alpha=0.7, c=data['Price'], cmap='viridis', edgecolors='black')
-        ax_scatter_custom.set_title('Price vs Number of Stops', fontsize=14, fontweight='bold')
-        ax_scatter_custom.set_xlabel('Price', fontsize=12)
-        ax_scatter_custom.set_ylabel('Number of Stops', fontsize=12)
-        ax_scatter_custom.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
-        fig_scatter_custom.colorbar(scatter, label='Price')  # Add colorbar to the figure
-        st.pyplot(fig_scatter_custom)
-        # --- ADDED: Airline Distribution Countplot with Styling ---
-        st.header("Airline Distribution (Styled)")
-        fig_countplot, ax_countplot = plt.subplots(figsize=(10, 6))
-        sns.countplot(x="Airline", data=data, hue="Airline", palette="muted", legend=False, ax=ax_countplot)
-        ax_countplot.set_title("✈️ Airline Distribution ✈️", fontweight="bold", fontsize=14, color="#80aaff")
-        ax_countplot.set_xlabel("Airline")
-        ax_countplot.set_ylabel("Count")
-        ax_countplot.tick_params(axis='x', rotation=90, labelsize=8)
-        fig_countplot.tight_layout()
-        st.pyplot(fig_countplot)
-        # Create the line plot
-        st.subheader("Ticket Price Trends Over Time")
-        fig_lineplot, ax_lineplot = plt.subplots(figsize=(10, 6))
-        sns.lineplot(x="Date_of_Journey", y="Price", data=data, hue="Airline", marker="o", palette="viridis", ax=ax_lineplot)  # Changed x to "Date_of_Journey" and y to "Price"
-        ax_lineplot.set_title("Ticket Price Trends Over Time", fontsize=14, fontweight="bold")
-        ax_lineplot.set_xlabel("Date", fontsize=12)
-        ax_lineplot.set_ylabel("Price (₹) ", fontsize=12)
-        ax_lineplot.tick_params(axis='x', rotation=90)
-        fig_lineplot.tight_layout()
-        st.pyplot(fig_lineplot)
-        # Assuming 'Days_Until_Departure' is in your data, we first calculate the frequency of each unique value
-        st.subheader("Days Until Departure (Line Plot)")
-        days_count = data['Days_Until_Departure'].value_counts().sort_index()
-        fig_days_line, ax_days_line = plt.subplots(figsize=(10, 6))
-        ax_days_line.plot(days_count.index, days_count.values, marker='o', color='skyblue', linewidth=2)
-        ax_days_line.set_title('Days Until Departure (Line Plot)', fontsize=12, fontweight='bold')
-        ax_days_line.set_xlabel('Days Until Departure', fontsize=12)
-        ax_days_line.set_ylabel('Count', fontsize=12)
-        fig_days_line.tight_layout()
-        st.pyplot(fig_days_line)
-        # Set style
-        st.subheader("Price Distribution by Cabin Class (Customized)")
-        sns.set(style="whitegrid")
-        fig_boxplot_cabin, ax_boxplot_cabin = plt.subplots(figsize=(10, 8))
-        sns.boxplot(x="Cabin_Class", y="Price", data=data, palette="Set1", hue="Airline", ax=ax_boxplot_cabin)
-        ax_boxplot_cabin.set_title("Price Distribution by Cabin Class (Customized)", fontsize=14, fontweight='bold')
-        ax_boxplot_cabin.set_xlabel("Cabin Class", fontsize=12)
-        ax_boxplot_cabin.set_ylabel("Price ()", fontsize=12)
-        ax_boxplot_cabin.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
-        fig_boxplot_cabin.tight_layout()
-        st.pyplot(fig_boxplot_cabin)
-        # Set style for a clean, modern look
-        st.subheader("Price Distribution by Cabin Class")
-        sns.set(style="whitegrid")
-        fig_boxplot_cabin2, ax_boxplot_cabin2 = plt.subplots(figsize=(10, 6))
-        sns.boxplot(x="Cabin_Class", y="Price", data=data, palette="Set2", hue="Cabin_Class", ax=ax_boxplot_cabin2)
-        ax_boxplot_cabin2.set_title("Price Distribution by Cabin Class ", fontsize=14, fontweight='bold', color="#2c3e50")
-        ax_boxplot_cabin2.set_xlabel("Cabin Class", fontsize=12)
-        ax_boxplot_cabin2.set_ylabel("Price ($)", fontsize=12)
-        ax_boxplot_cabin2.grid(True, which='both', linestyle='--', linewidth=0.7, alpha=0.6)
-        fig_boxplot_cabin2.tight_layout()
-        st.pyplot(fig_boxplot_cabin2)
-        # Set style for a clean, modern look
-        st.subheader("Price Distribution by Airline")
-        sns.set(style="whitegrid")
-        fig_boxplot_airline, ax_boxplot_airline = plt.subplots(figsize=(10, 6))
-        sns.boxplot(x="Airline", y="Price", data=data.sort_values('Price', ascending=False), hue="Airline", palette="Set2", ax=ax_boxplot_airline)
-        ax_boxplot_airline.set_title(" Price Distribution by Airline", fontsize=14, fontweight='bold', color="#2c3e50")
-        ax_boxplot_airline.set_xlabel("Airline ", fontsize=12)
-        ax_boxplot_airline.set_ylabel("Price", fontsize=12)
-        ax_boxplot_airline.tick_params(axis='x', rotation=90)
-        ax_boxplot_airline.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
-        fig_boxplot_airline.tight_layout()
-        st.pyplot(fig_boxplot_airline)
+
+    elif page == "Model Evaluation":
+        st.header("Model Evaluation")
+        y_pred = random_forest_model.predict(X_test)
+        mse = mean_squared_error(y_test, y_pred)
+        r2 = r2_score(y_test, y_pred)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Mean Squared Error", f"{mse:.2f}")
+        with col2:
+            st.metric("R^2 Score", f"{r2:.2f}")
+
+        st.subheader("Feature Importance")
+        feature_importance = pd.Series(random_forest_model.feature_importances_, index=X.columns).sort_values(ascending=False)
+        fig_feature_importance, ax_feature_importance = plt.subplots(figsize=(10, 6))
+        feature_importance.plot(kind='bar', ax=ax_feature_importance, color="#2E86C1")
+        ax_feature_importance.set_title("Feature Importance from Random Forest")
+        ax_feature_importance.set_ylabel("Importance Score")
+        st.pyplot(fig_feature_importance)
+
 else:
-    st.write("Failed to load data.  Check the GitHub URL and your internet connection.")
+    st.error("Failed to load data. Check the GitHub URL and your internet connection.")
