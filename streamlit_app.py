@@ -142,6 +142,11 @@ if data is not None:
 
     # --- Feature Engineering and Encoding ---
 
+    # Store original values for mapping in prediction
+    airline_mapping = dict(enumerate(data['Airline'].astype('category').cat.categories))
+    source_mapping = dict(enumerate(data['Source'].astype('category').cat.categories))
+    destination_mapping = dict(enumerate(data['Destination'].astype('category').cat.categories))
+
     # Convert categorical features to numerical
     for col in ['Airline', 'Source', 'Destination']:
         data[col] = data[col].astype('category').cat.codes
@@ -206,34 +211,38 @@ if data is not None:
     # --- Prediction Interface ---
     st.header("Flight Fare Prediction")
     # Input fields
-    # Ensure that the options passed to selectbox are from the training data
-    source = st.selectbox("Source", options=X_train['Source'].unique())
-    destination = st.selectbox("Destination", options=X_train['Destination'].unique())
+
+    # Use original names in selectboxes
+    source = st.selectbox("Source", options=list(source_mapping.values()))
+    destination = st.selectbox("Destination", options=list(destination_mapping.values()))
+    airline = st.selectbox("Airline", options=list(airline_mapping.values()))
+
     stops = st.slider("Number of Stops", min_value=0, max_value=5, value=1)
-    airline = st.selectbox("Airline", options=X_train['Airline'].unique())
     dep_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=10)
     dep_minute = st.slider("Departure Minute", min_value=0, max_value=59, value=30)
     arrival_hour = st.slider("Arrival Hour", min_value=0, max_value=23, value=13)
     arrival_minute = st.slider("Arrival Minute", min_value=0, max_value=59, value=45)
-    #duration_hours = st.slider("Duration Hours", min_value=0, max_value=20, value=3)
-    #duration_minutes = st.slider("Duration Minutes", min_value=0, max_value=59, value=15)
     journey_day = st.slider("Journey Day", min_value=1, max_value=31, value=15)
     journey_month = st.slider("Journey Month", min_value=1, max_value=12, value=3)
 
     # Prediction button
     if st.button("Predict Fare"):
         # Prepare input data
+
+        # Map names back to numerical codes
+        source_code = [k for k, v in source_mapping.items() if v == source][0]
+        destination_code = [k for k, v in destination_mapping.items() if v == destination][0]
+        airline_code = [k for k, v in airline_mapping.items() if v == airline][0]
+
         input_data = pd.DataFrame({
-            'Airline': [airline],
-            'Source': [source],
-            'Destination': [destination],
+            'Airline': [airline_code],
+            'Source': [source_code],
+            'Destination': [destination_code],
             'Total_Stops': [stops],
             'Dep_Time_hour': [dep_hour],
             'Dep_Time_minute': [dep_minute],
             'Arrival_Time_hour': [arrival_hour],
             'Arrival_Time_minute': [arrival_minute],
-            #'Duration_hours': [duration_hours],
-            #'Duration_minutes': [duration_minutes],
             'Journey_Day': [journey_day],
             'Journey_Month': [journey_month]
         })
