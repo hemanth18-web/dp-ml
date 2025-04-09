@@ -40,6 +40,7 @@ st.title("Flight Fare Data Exploration and Prediction")
 
 if data is not None:
     # --- Data Cleaning and Conversion ---
+
     # Replace "non-stop" with 0
     data['Total_Stops'] = data['Total_Stops'].replace("non-stop", 0)
 
@@ -47,31 +48,22 @@ if data is not None:
     data['Total_Stops'] = data['Total_Stops'].replace('NaN', np.nan)  # Replace string 'NaN' with actual NaN
     data['Total_Stops'] = data['Total_Stops'].fillna(0)  # Fill NaN with 0 (or another appropriate value)
 
-    # --- Identify Non-Convertible Values ---
-    def is_number(value):
-        try:
-            float(value)
-            return True
-        except ValueError:
-            return False
+    # **Correctly Handle Non-Numeric Values**
+    def convert_stops_to_numeric(stops):
+        if isinstance(stops, (int, float)):  # Check if already numeric
+            return stops
+        elif '→' in stops:
+            return len(stops.split('→'))  # Count the number of stops based on '→'
+        else:
+            return 0  # Default to 0 for unknown values
 
-    non_numeric_values = data['Total_Stops'][data['Total_Stops'].apply(lambda x: not is_number(x))]
-    unique_non_numeric = non_numeric_values.unique()
+    data['Total_Stops'] = data['Total_Stops'].astype(str).apply(convert_stops_to_numeric) # Convert to string first to handle mixed types
 
-    if len(unique_non_numeric) > 0:
-        st.warning(f"Found non-numeric values in 'Total_Stops': {unique_non_numeric}")
-        # Replace these values with a suitable numeric value (e.g., 0) or NaN
-        # For example, if you want to replace all non-numeric values with 0:
-        for val in unique_non_numeric:
-            data['Total_Stops'] = data['Total_Stops'].replace(val, 0)
-
-    else:
-        st.success("No non-numeric values found in 'Total_Stops'")
-
-    # Convert 'Total_Stops' to numeric
-    data['Total_Stops'] = pd.to_numeric(data['Total_Stops'])
+    # Convert 'Total_Stops' to numeric *after* cleaning
+    data['Total_Stops'] = pd.to_numeric(data['Total_Stops'], errors='coerce').fillna(0)
 
     # --- Feature Engineering and Encoding ---
+
     # Convert categorical features to numerical
     for col in ['Airline', 'Source', 'Destination']:
         data[col] = data[col].astype('category').cat.codes
@@ -109,7 +101,6 @@ if data is not None:
     y_pred = random_forest_model.predict(X_test)
     mse = mean_squared_error(y_test, y_pred)
     r2 = r2_score(y_test, y_pred)
-
     st.write(f"Mean Squared Error: {mse:.2f}")
     st.write(f"R^2 Score: {r2:.2f}")
 
@@ -124,7 +115,6 @@ if data is not None:
 
     # --- Prediction Interface ---
     st.header("Flight Fare Prediction")
-
     # Input fields
     # Ensure that the options passed to selectbox are from the training data
     source = st.selectbox("Source", options=X_train['Source'].unique())
@@ -162,24 +152,20 @@ if data is not None:
         for col in X_train.columns:
             if col not in input_data.columns:
                 input_data[col] = 0  # Or some other appropriate default value
-
         input_data = input_data[X_train.columns]  # Ensure correct column order
 
         # Make prediction
         predicted_fare = random_forest_model.predict(input_data)[0]
-
         st.success(f"Predicted Flight Fare: ₹{predicted_fare:.2f}")
 
     st.header("Data Preview")
     st.dataframe(data.head())
-
     st.header("Data Summary")
     st.write(f"Number of rows: {data.shape[0]}")
     st.write(f"Number of columns: {data.shape[1]}")
 
     # --- VISUALIZATIONS ---
     st.header("Visualizations")
-
     # Airline Distribution
     st.subheader("Airline Distribution")
     fig_airline, ax_airline = plt.subplots(figsize=(10, 6))
@@ -279,6 +265,5 @@ if data is not None:
     ax_boxplot_airline.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
     fig_boxplot_airline.tight_layout()
     st.pyplot(fig_boxplot_airline)
-
 else:
     st.write("Failed to load data.  Check the GitHub URL and your internet connection.")
