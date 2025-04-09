@@ -46,7 +46,7 @@ def load_data_from_github(url):
 data = load_data_from_github(github_url)
 
 # --- STREAMLIT APP ---
-st.set_page_config(page_title="Flight Fare Predictor", page_icon="✈️")
+st.set_page_config(page_title="Flight Fare Predictor22", page_icon="✈️")
 
 # Custom CSS for styling
 st.markdown("""
