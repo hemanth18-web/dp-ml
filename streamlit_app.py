@@ -77,6 +77,21 @@ if data is not None:
     except Exception as e:
         st.error(f"Error processing 'Dep_Time' column: {e}")
 
+    # **Handle Arrival_Time Column**
+    try:
+        # Attempt to convert 'Arrival_Time' to datetime objects
+        data['Arrival_Time'] = pd.to_datetime(data['Arrival_Time'], errors='coerce')
+
+        # Extract hour and minute
+        data['Arrival_Time_hour'] = data['Arrival_Time'].dt.hour
+        data['Arrival_Time_minute'] = data['Arrival_Time'].dt.minute
+
+        # Drop the original 'Arrival_Time' column
+        data.drop('Arrival_Time', axis=1, inplace=True, errors='ignore')  # Use errors='ignore'
+
+    except Exception as e:
+        st.error(f"Error processing 'Arrival_Time' column: {e}")
+
     # --- Feature Engineering and Encoding ---
 
     # Convert categorical features to numerical
