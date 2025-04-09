@@ -43,6 +43,26 @@ if data is not None:
     data['Total_Stops'] = data['Total_Stops'].replace('NaN', np.nan)  # Replace string 'NaN' with actual NaN
     data['Total_Stops'] = data['Total_Stops'].fillna(0)  # Fill NaN with 0 (or another appropriate value)
 
+    # --- Identify Non-Convertible Values ---
+    def is_number(value):
+        try:
+            float(value)
+            return True
+        except ValueError:
+            return False
+
+    non_numeric_values = data['Total_Stops'][data['Total_Stops'].apply(lambda x: not is_number(x))]
+    unique_non_numeric = non_numeric_values.unique()
+
+    if len(unique_non_numeric) > 0:
+        st.warning(f"Found non-numeric values in 'Total_Stops': {unique_non_numeric}")
+        # Replace these values with a suitable numeric value (e.g., 0) or NaN
+        # For example, if you want to replace all non-numeric values with 0:
+        for val in unique_non_numeric:
+            data['Total_Stops'] = data['Total_Stops'].replace(val, 0)
+    else:
+        st.success("No non-numeric values found in 'Total_Stops'")
+
     # Convert 'Total_Stops' to numeric
     data['Total_Stops'] = pd.to_numeric(data['Total_Stops'])
 
@@ -51,7 +71,7 @@ if data is not None:
 
     st.header("Data Summary")
     st.write(f"Number of rows: {data.shape[0]}")
-    st.write(f"Number of columns: {data.shape[1]}")
+    st.write(f"Number of columns: {data.shape[1]")
 
     # --- UNIQUE VALUES ---
     st.header("Unique Values in Each Column")
