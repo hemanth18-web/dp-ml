@@ -8,7 +8,7 @@ import io  # Import the io module
 
 # --- LOAD DATA ---
 # GitHub URL for the dataset
-github_url = "https://raw.githubusercontent.com/hemanth18-web/dp-ml/refs/heads/main/Data_Train%20(1).csv"
+github_url = "https://raw.githubusercontent.com/hemanth18-web/dp-ml/refs/heads/main/Updated_Flight_Fare_Data%(20).csv"
 
 # Function to load the dataset from GitHub
 @st.cache_data
