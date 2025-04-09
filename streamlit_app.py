@@ -19,22 +19,31 @@ github_url = "https://raw.githubusercontent.com/hemanth18-web/dp-ml/refs/heads/m
 def load_data_from_github(url):
     try:
         response = requests.get(url)
-        response.raise_for_status()
+        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
         csv_data = response.content.decode('utf-8')
         data = pd.read_csv(io.StringIO(csv_data))
         return data
+    except requests.exceptions.HTTPError as e:
+        st.error(f"HTTPError: Could not download the dataset from GitHub. Status code: {e.response.status_code}")
+        return None
+    except requests.exceptions.ConnectionError as e:
+        st.error(f"ConnectionError: Could not connect to GitHub. Please check your internet connection.")
+        return None
+    except requests.exceptions.Timeout as e:
+        st.error(f"TimeoutError: Request to GitHub timed out.")
+        return None
     except requests.exceptions.RequestException as e:
-        st.error(f"Failed to download the dataset from GitHub: {e}")
+        st.error(f"RequestException: An error occurred while making the request to GitHub: {e}")
         return None
     except pd.errors.ParserError as e:
-        st.error(f"Failed to parse the CSV data: {e}")
+        st.error(f"ParserError: Failed to parse the CSV data: {e}")
         return None
     except Exception as e:
         st.error(f"An unexpected error occurred: {e}")
         return None
 
 # Load the dataset
-data = load_data_from_github(url)
+data = load_data_from_github(github_url)
 
 # --- STREAMLIT APP ---
 st.set_page_config(page_title="Flight Fare Predictor", page_icon="✈️")
