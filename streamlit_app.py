@@ -36,7 +36,7 @@ def load_data_from_github(url):
 data = load_data_from_github(github_url)
 
 # --- STREAMLIT APP ---
-st.title("Flight Fare Data Exploration and Prediction")
+st.title("Flight Fare Data Exploration and Prediction2")
 
 if data is not None:
     # --- Data Cleaning and Conversion ---
@@ -197,12 +197,8 @@ if data is not None:
     st.pyplot(fig_boxplot_airline)
 
     # --- Feature Engineering and Preprocessing for Model ---
-    # Convert categorical features to numerical using Label Encoding
-    le = LabelEncoder()
-    data['Airline'] = le.fit_transform(data['Airline'])
-    data['Source'] = le.fit_transform(data['Source'])
-    data['Destination'] = le.fit_transform(data['Destination'])
-    data['Cabin_Class'] = le.fit_transform(data['Cabin_Class'])
+    # Use original string values for 'Airline', 'Source', 'Destination', 'Cabin_Class'
+    # No Label Encoding here
 
     # Print column names for debugging
     print("Column Names Before Feature Selection:")
@@ -216,15 +212,21 @@ if data is not None:
         data['Duration_Minutes'] = data['Duration'] % 60
 
     # Select features, handling potential missing columns
-    features = ['Airline', 'Source', 'Destination', 'Total_Stops', 'Dep_Time_Hour', 'Dep_Time_Minute',
+    features = ['Total_Stops', 'Dep_Time_Hour', 'Dep_Time_Minute',
                 'Arrival_Time_Hour', 'Arrival_Time_Minute', 'Duration_Hours', 'Duration_Minutes',
-                'Journey_Day', 'Journey_Month', 'Cabin_Class', 'Days_Until_Departure']
+                'Journey_Day', 'Journey_Month', 'Days_Until_Departure', 'Airline', 'Source', 'Destination', 'Cabin_Class']
 
     # Check if all features exist in the DataFrame
     missing_features = [f for f in features if f not in data.columns]
     if missing_features:
         st.error(f"Missing features: {missing_features}.  Please check your data.")
         st.stop()  # Stop execution if features are missing
+
+    # One-Hot Encode Categorical Features
+    data = pd.get_dummies(data, columns=['Airline', 'Source', 'Destination', 'Cabin_Class'], drop_first=True)
+
+    # Update the features list to include the one-hot encoded columns
+    features = [col for col in data.columns if col not in ['Price', 'Date_of_Journey', 'Dep_Time', 'Arrival_Time', 'Duration']]  # Exclude non-feature columns
 
     X = data[features]
     y = data['Price']
@@ -256,11 +258,18 @@ if data is not None:
     # --- Prediction Form ---
     st.header("Flight Price Prediction")
 
+    # Get unique values for selectboxes
+    # Extract base column names before one-hot encoding
+    unique_airlines = data.columns[data.columns.str.startswith('Airline_')].str.replace('Airline_', '').tolist()
+    unique_sources = data.columns[data.columns.str.startswith('Source_')].str.replace('Source_', '').tolist()
+    unique_destinations = data.columns[data.columns.str.startswith('Destination_')].str.replace('Destination_', '').tolist()
+    unique_cabin_classes = data.columns[data.columns.str.startswith('Cabin_Class_')].str.replace('Cabin_Class_', '').tolist()
+
     # User input fields
-    source = st.selectbox("Source", options=data['Source'].unique())
-    destination = st.selectbox("Destination", options=data['Destination'].unique())
+    source = st.selectbox("Source", options=unique_sources)
+    destination = st.selectbox("Destination", options=unique_destinations)
     stops = st.slider("Number of Stops", min_value=0, max_value=5, value=0)
-    airline = st.selectbox("Airline", options=data['Airline'].unique())
+    airline = st.selectbox("Airline", options=unique_airlines)
     dep_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=12)
     dep_minute = st.slider("Departure Minute", min_value=0, max_value=59, value=0)
     arrival_hour = st.slider("Arrival Hour", min_value=0, max_value=23, value=14)
@@ -269,31 +278,36 @@ if data is not None:
     duration_minutes = st.slider("Duration Minutes", min_value=0, max_value=59, value=0)
     journey_day = st.slider("Journey Day", min_value=1, max_value=31, value=15)
     journey_month = st.slider("Journey Month", min_value=1, max_value=12, value=3)
-    cabin_class = st.selectbox("Cabin Class", options=data['Cabin_Class'].unique())
+    cabin_class = st.selectbox("Cabin Class", options=unique_cabin_classes)
     days_until_departure = st.slider("Days Until Departure", min_value=1, max_value=365, value=30)
 
     # Prediction button
     if st.button("Predict Price"):
         # Prepare input data
-        input_data = pd.DataFrame({
-            'Airline': [airline],
-            'Source': [source],
-            'Destination': [destination],
-            'Total_Stops': [stops],
-            'Dep_Time_Hour': [dep_hour],
-            'Dep_Time_Minute': [dep_minute],
-            'Arrival_Time_Hour': [arrival_hour],
-            'Arrival_Time_Minute': [arrival_minute],
-            'Duration_Hours': [duration_hours],
-            'Duration_Minutes': [duration_minutes],
-            'Journey_Day': [journey_day],
-            'Journey_Month': [journey_month],
-            'Cabin_Class': [cabin_class],
-            'Days_Until_Departure': [days_until_departure]
-        })
+        input_data = {}
+        for feature in features:
+            input_data[feature] = [0]  # Initialize all features to 0
+
+        # Set the values for the user-selected features
+        input_data[f'Airline_{airline}'] = [1]  # Set the selected airline to 1
+        input_data[f'Source_{source}'] = [1]  # Set the selected source to 1
+        input_data[f'Destination_{destination}'] = [1]  # Set the selected destination to 1
+        input_data[f'Cabin_Class_{cabin_class}'] = [1]  # Set the selected cabin class to 1
+        input_data['Total_Stops'] = [stops]
+        input_data['Dep_Time_Hour'] = [dep_hour]
+        input_data['Dep_Time_Minute'] = [dep_minute]
+        input_data['Arrival_Time_Hour'] = [arrival_hour]
+        input_data['Arrival_Time_Minute'] = [arrival_minute]
+        input_data['Duration_Hours'] = [duration_hours]
+        input_data['Duration_Minutes'] = [duration_minutes]
+        input_data['Journey_Day'] = [journey_day]
+        input_data['Journey_Month'] = [journey_month]
+        input_data['Days_Until_Departure'] = [days_until_departure]
+
+        input_df = pd.DataFrame(input_data)
 
         # Make prediction
-        prediction = random_forest_model.predict(input_data)
+        prediction = random_forest_model.predict(input_df)
         st.success(f"Predicted Flight Price: ₹{prediction[0]:.2f}")
 
 else:
