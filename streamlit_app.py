@@ -245,15 +245,25 @@ if data is not None:
     # Date of Journey Conversion with Error Handling
     try:
         data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], format="%Y-%m-%d %H:%M:%S", errors='raise')
+        st.write(f"Date_of_Journey dtype after conversion: {data['Date_of_Journey'].dtype}")  # Debugging print
     except ValueError as e:
         st.error(f"Error converting 'Date_of_Journey' to datetime: {e}.  Please check the date format in your data and update the 'format' argument in pd.to_datetime().")
         st.stop()  # Stop execution if date conversion fails
 
     # Days Until Departure Calculation (Corrected)
     today = date(2025, 4, 11)  # Use today's date as reference (date object)
-    data['Days_Until_Departure'] = (data['Date_of_Journey'].dt.date - today).dt.days  # Subtract dates
+
+    # Explicitly extract the date part
+    try:
+        data['Date_of_Journey_Date'] = data['Date_of_Journey'].dt.date
+        st.write(f"Date_of_Journey_Date dtype: {data['Date_of_Journey_Date'].dtype}")  # Debugging print
+        data['Days_Until_Departure'] = (data['Date_of_Journey_Date'] - today).dt.days  # Subtract dates
+    except Exception as e:
+        st.error(f"Error calculating Days_Until_Departure: {e}")
+        st.stop()
 
     data.drop('Date_of_Journey', axis=1, inplace=True, errors='ignore')
+    data.drop('Date_of_Journey_Date', axis=1, inplace=True, errors='ignore')  # Remove the temporary column
 
     # Remove columns with any NaN values
     data = data.dropna(axis=1, how='any')
