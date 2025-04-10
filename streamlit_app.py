@@ -11,42 +11,9 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 from datetime import datetime
 
-# GitHub URL for the dataset
-github_url = "https://raw.githubusercontent.com/hemanth18-web/dp-ml/refs/heads/main/Updated_Flight_Fare_Data%20(20).csv"
-
-# Function to load the dataset from GitHub
-@st.cache_data
-def load_data_from_github(url):
-    try:
-        response = requests.get(url)
-        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
-        csv_data = response.content.decode('utf-8')
-        data = pd.read_csv(io.StringIO(csv_data))
-        return data
-    except requests.exceptions.HTTPError as e:
-        st.error(f"HTTPError: Could not download the dataset from GitHub. Status code: {e.response.status_code}")
-        return None
-    except requests.exceptions.ConnectionError as e:
-        st.error(f"ConnectionError: Could not connect to GitHub. Please check your internet connection.")
-        return None
-    except requests.exceptions.Timeout as e:
-        st.error(f"TimeoutError: Request to GitHub timed out.")
-        return None
-    except requests.exceptions.RequestException as e:
-        st.error(f"RequestException: An error occurred while making the request to GitHub: {e}")
-        return None
-    except pd.errors.ParserError as e:
-        st.error(f"ParserError: Failed to parse the CSV data: {e}")
-        return None
-    except Exception as e:
-        st.error(f"An unexpected error occurred: {e}")
-        return None
-
-# Load the dataset
-data = load_data_from_github(github_url)
-
 # --- STREAMLIT APP ---
-st.set_page_config(page_title="Flight Fare Predictor", page_icon="✈️", layout="wide")
+st.set_page_config(page_title="Flight Fare Predictor", page_icon="✈️", layout="wide")  # MOVE THIS TO THE TOP!
+
 
 # Custom CSS for styling
 st.markdown("""
@@ -160,6 +127,40 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# GitHub URL for the dataset
+github_url = "https://raw.githubusercontent.com/hemanth18-web/dp-ml/refs/heads/main/Updated_Flight_Fare_Data%20(20).csv"
+
+# Function to load the dataset from GitHub
+@st.cache_data
+def load_data_from_github(url):
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+        csv_data = response.content.decode('utf-8')
+        data = pd.read_csv(io.StringIO(csv_data))
+        return data
+    except requests.exceptions.HTTPError as e:
+        st.error(f"HTTPError: Could not download the dataset from GitHub. Status code: {e.response.status_code}")
+        return None
+    except requests.exceptions.ConnectionError as e:
+        st.error(f"ConnectionError: Could not connect to GitHub. Please check your internet connection.")
+        return None
+    except requests.exceptions.Timeout as e:
+        st.error(f"TimeoutError: Request to GitHub timed out.")
+        return None
+    except requests.exceptions.RequestException as e:
+        st.error(f"RequestException: An error occurred while making the request to GitHub: {e}")
+        return None
+    except pd.errors.ParserError as e:
+        st.error(f"ParserError: Failed to parse the CSV data: {e}")
+        return None
+    except Exception as e:
+        st.error(f"An unexpected error occurred: {e}")
+        return None
+
+# Load the dataset
+data = load_data_from_github(github_url)
+
 # --- DATA PREPROCESSING (Move this outside the conditional page logic) ---
 if data is not None:
     # --- Data Cleaning and Conversion ---
@@ -174,6 +175,7 @@ if data is not None:
             return len(stops.split('→'))
         else:
             return 0
+
     data['Total_Stops'] = data['Total_Stops'].astype(str).apply(convert_stops_to_numeric)
     data['Total_Stops'] = pd.to_numeric(data['Total_Stops'], errors='coerce').fillna(0)
 
@@ -213,9 +215,9 @@ if data is not None:
                     return 0
         except:
             return 0
+
     data['Duration_minutes'] = data['Duration'].apply(convert_duration_to_minutes)
     data.drop('Duration', axis=1, inplace=True, errors='ignore')
-
     data.drop('Additional_Info', axis=1, inplace=True, errors='ignore')
     data['Cabin_Class'] = data['Cabin_Class'].astype('category').cat.codes
     data['Flight_Layover'] = data['Flight_Layover'].astype('category').cat.codes
@@ -240,6 +242,7 @@ if data is not None:
     data['Journey_Day'] = data['Date_of_Journey'].dt.day
     data['Journey_Month'] = data['Date_of_Journey'].dt.month
 
+    # Remove columns with any NaN values
     data = data.dropna(axis=1, how='any')
 
     for col in data.columns:
@@ -251,7 +254,6 @@ if data is not None:
 
     X = data.drop(['Price'], axis=1, errors='ignore')
     y = data['Price']
-
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     # --- Model Training (Train the model *once* outside the prediction) ---
@@ -296,6 +298,7 @@ if data is not None:
 
         st.subheader("Feature Importance")
         feature_importance = pd.Series(random_forest_model.feature_importances_, index=X.columns).sort_values(ascending=False)
+
         fig_feature_importance, ax_feature_importance = plt.subplots(figsize=(10, 6))
         feature_importance.plot(kind='bar', ax=ax_feature_importance, color="#39A7FF")
         ax_feature_importance.set_title("Feature Importance from Random Forest")
@@ -355,9 +358,12 @@ if data is not None:
                 'Journey_Month': [journey_month]
             })
 
+            # Ensure all columns from training data are present in input data
             for col in X_train.columns:
                 if col not in input_data.columns:
-                    input_data[col] = 0
+                    input_data[col] = 0  # Fill missing columns with 0
+
+            # Ensure the order of columns is the same as the training data
             input_data = input_data[X_train.columns]
 
             # Make prediction
@@ -381,7 +387,6 @@ if data is not None:
         st.dataframe(data.head(10))
 
         # --- ADDING ALL GRAPHS FROM ORIGINAL CODE ---
-
         # Airline Distribution
         st.subheader("Airline Distribution")
         fig_airline, ax_airline = plt.subplots(figsize=(10, 6))
@@ -483,6 +488,5 @@ if data is not None:
         ax_boxplot_airline.tick_params(axis='x', rotation=90)
         fig_boxplot_airline.tight_layout()
         st.pyplot(fig_boxplot_airline)
-
 else:
     st.error("Failed to load data. Check the GitHub URL and your internet connection.")
