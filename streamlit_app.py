@@ -217,9 +217,11 @@ if data is not None:
     data.drop('Duration', axis=1, inplace=True, errors='ignore')
     data.drop('Additional_Info', axis=1, inplace=True, errors='ignore')
 
-    # Cabin Class Mapping
-    cabin_class_mapping = dict(enumerate(data['Cabin_Class'].astype('category').cat.categories))
-    data['Cabin_Class'] = data['Cabin_Class'].astype('category').cat.codes
+    # No longer convert to numerical codes here
+    # data['Cabin_Class'] = data['Cabin_Class'].astype('category').cat.codes
+    # data['Airline'] = data['Airline'].astype('category').cat.codes
+    # data['Source'] = data['Source'].astype('category').cat.codes
+    # data['Destination'] = data['Destination'].astype('category').cat.codes
 
     data['Flight_Layover'] = data['Flight_Layover'].astype('category').cat.codes
     try:
@@ -231,13 +233,6 @@ if data is not None:
     except Exception as e:
         st.error(f"Error processing 'Booking_Date' column: {e}")
 
-    airline_mapping = dict(enumerate(data['Airline'].astype('category').cat.categories))
-    source_mapping = dict(enumerate(data['Source'].astype('category').cat.categories))
-    destination_mapping = dict(enumerate(data['Destination'].astype('category').cat.categories))
-
-    for col in ['Airline', 'Source', 'Destination']:
-        data[col] = data[col].astype('category').cat.codes
-
     data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], errors='coerce')
     data['Journey_Day'] = data['Date_of_Journey'].dt.day
     data['Journey_Month'] = data['Date_of_Journey'].dt.month
@@ -245,18 +240,23 @@ if data is not None:
     # Remove columns with any NaN values
     data = data.dropna(axis=1, how='any')
 
+    # Attempt to convert all columns to numeric, except the specified string columns
     for col in data.columns:
-        try:
-            data[col] = pd.to_numeric(data[col])
-        except ValueError:
-            st.error(f"Could not convert column '{col}' to numeric.  Please investigate.")
-            st.stop()
+        if col not in ['Airline', 'Source', 'Destination', 'Cabin_Class']:
+            try:
+                data[col] = pd.to_numeric(data[col])
+            except ValueError:
+                st.error(f"Could not convert column '{col}' to numeric.  Please investigate.")
+                st.stop()
+
+    # --- Model Training ---
+    # One-Hot Encode Categorical Variables
+    data = pd.get_dummies(data, columns=['Airline', 'Source', 'Destination', 'Cabin_Class'], drop_first=True)
 
     X = data.drop(['Price'], axis=1, errors='ignore')
     y = data['Price']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # --- Model Training (Train the model *once* outside the prediction) ---
     @st.cache_resource  # Use cache_resource for models
     def train_model(X_train, y_train):
         model = RandomForestRegressor(n_estimators=100, random_state=42)
@@ -315,15 +315,20 @@ if data is not None:
             </div>
         """, unsafe_allow_html=True)
 
+        # Get unique values for selectboxes
+        unique_airlines = data['Airline'].unique().tolist()
+        unique_sources = data['Source'].unique().tolist()
+        unique_destinations = data['Destination'].unique().tolist()
+        unique_cabin_classes = data['Cabin_Class'].unique().tolist()
+
         # Input fields using columns for layout
         col1, col2 = st.columns(2)
         with col1:
-            source = st.selectbox("Source", options=list(source_mapping.values()), help="Select the origin city")
-            destination = st.selectbox("Destination", options=list(destination_mapping.values()), help="Select the destination city")
-            airline = st.selectbox("Airline", options=list(airline_mapping.values()), help="Select the airline")
+            source = st.selectbox("Source", options=unique_sources, help="Select the origin city")
+            destination = st.selectbox("Destination", options=unique_destinations, help="Select the destination city")
+            airline = st.selectbox("Airline", options=unique_airlines, help="Select the airline")
             stops = st.slider("Number of Stops", min_value=0, max_value=5, value=0, help="Number of layovers")
-            # Cabin Class Input
-            cabin_class = st.selectbox("Cabin Class", options=list(cabin_class_mapping.values()), help="Select the cabin class")
+            cabin_class = st.selectbox("Cabin Class", options=unique_cabin_classes, help="Select the cabin class")
 
         with col2:
             # Use date_input for journey date
@@ -337,35 +342,24 @@ if data is not None:
 
         if st.button("Predict Fare"):
             # Prepare input data
-            source_code = [k for k, v in source_mapping.items() if v == source][0]
-            destination_code = [k for k, v in destination_mapping.items() if v == destination][0]
-            airline_code = [k for k, v in airline_mapping.items() if v == airline][0]
-            cabin_class_code = [k for k, v in cabin_class_mapping.items() if v == cabin_class][0]
-
-            # Extract day and month from journey_date
-            journey_day = journey_date.day
-            journey_month = journey_date.month
-
             input_data = pd.DataFrame({
-                'Airline': [airline_code],
-                'Source': [source_code],
-                'Destination': [destination_code],
                 'Total_Stops': [stops],
                 'Dep_Time_hour': [dep_hour],
                 'Dep_Time_minute': [dep_minute],
                 'Arrival_Time_hour': [arrival_hour],
                 'Arrival_Time_minute': [arrival_minute],
-                'Journey_Day': [journey_day],
-                'Journey_Month': [journey_month],
-                'Cabin_Class': [cabin_class_code]  # Include Cabin Class
+                'Journey_Day': [journey_date.day],
+                'Journey_Month': [journey_date.month],
+                'Airline_' + airline: [1],  # One-Hot Encode
+                'Source_' + source: [1],    # One-Hot Encode
+                'Destination_' + destination: [1],  # One-Hot Encode
+                'Cabin_Class_' + cabin_class: [1]   # One-Hot Encode
             })
 
-            # Ensure all columns from training data are present in input data
+            # Add missing columns and ensure correct order
             for col in X_train.columns:
                 if col not in input_data.columns:
-                    input_data[col] = 0  # Fill missing columns with 0
-
-            # Ensure the order of columns is the same as the training data
+                    input_data[col] = 0
             input_data = input_data[X_train.columns]
 
             # Make prediction
