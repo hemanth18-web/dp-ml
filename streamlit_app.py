@@ -9,11 +9,10 @@ import re  # Import the regular expression module
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
-from datetime import datetime, date  # Import date as well
+from datetime import datetime
 
 # --- STREAMLIT APP ---
 st.set_page_config(page_title="Flight Fare Predictor", page_icon="✈️", layout="wide")  # MOVE THIS TO THE TOP!
-
 
 # Custom CSS for styling
 st.markdown("""
@@ -145,7 +144,7 @@ def load_data_from_github(url):
     except requests.exceptions.ConnectionError as e:
         st.error(f"ConnectionError: Could not connect to GitHub. Please check your internet connection.")
         return None
-    except requests.exceptions.TimeoutError as e:
+    except requests.exceptions.Timeout as e:
         st.error(f"TimeoutError: Request to GitHub timed out.")
         return None
     except requests.exceptions.RequestException as e:
@@ -178,7 +177,6 @@ if data is not None:
 
     data['Total_Stops'] = data['Total_Stops'].astype(str).apply(convert_stops_to_numeric)
     data['Total_Stops'] = pd.to_numeric(data['Total_Stops'], errors='coerce').fillna(0)
-
     try:
         data['Dep_Time'] = pd.to_datetime(data['Dep_Time'], errors='coerce')
         data['Dep_Time_hour'] = data['Dep_Time'].dt.hour
@@ -186,7 +184,6 @@ if data is not None:
         data.drop('Dep_Time', axis=1, inplace=True, errors='ignore')
     except Exception as e:
         st.error(f"Error processing 'Dep_Time' column: {e}")
-
     try:
         data['Arrival_Time'] = pd.to_datetime(data['Arrival_Time'], errors='coerce')
         data['Arrival_Time_hour'] = data['Arrival_Time'].dt.hour
@@ -225,7 +222,6 @@ if data is not None:
     data['Cabin_Class'] = data['Cabin_Class'].astype('category').cat.codes
 
     data['Flight_Layover'] = data['Flight_Layover'].astype('category').cat.codes
-
     try:
         data['Booking_Date'] = pd.to_datetime(data['Booking_Date'], errors='coerce')
         data['Booking_Day'] = data['Booking_Date'].dt.day
@@ -242,48 +238,9 @@ if data is not None:
     for col in ['Airline', 'Source', 'Destination']:
         data[col] = data[col].astype('category').cat.codes
 
-    # Date of Journey Conversion with Error Handling
-    try:
-        # First, try converting to datetime
-        data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], format="%Y-%m-%d %H:%M:%S", errors='raise')
-        st.write(f"Date_of_Journey dtype after initial conversion: {data['Date_of_Journey'].dtype}")
-
-        # Then, explicitly extract the date using a lambda function
-        data['Date_of_Journey_Date'] = data['Date_of_Journey'].apply(lambda x: x.date())
-        st.write(f"Date_of_Journey_Date dtype: {data['Date_of_Journey_Date'].dtype}")
-
-        # Check if the conversion was successful
-        if not pd.api.types.is_datetime64_any_dtype(data['Date_of_Journey']):
-            st.error("Date_of_Journey was not successfully converted to datetime.")
-            st.stop()
-
-        # Check if the date extraction was successful
-        if not pd.api.types.is_object_dtype(data['Date_of_Journey_Date']):
-            st.error("Date_of_Journey_Date was not successfully converted to date.")
-            st.stop()
-
-    except ValueError as e:
-        st.error(f"Error converting 'Date_of_Journey' to datetime: {e}.  Please check the date format in your data and update the 'format' argument in pd.to_datetime().")
-        st.stop()  # Stop execution if date conversion fails
-    except AttributeError as e:
-        st.error(f"Error extracting date from 'Date_of_Journey': {e}.  This likely means 'Date_of_Journey' is not a datetime column.")
-        st.stop()
-
-    # Days Until Departure Calculation (Corrected)
-    today = date(2025, 4, 11)  # Use today's date as reference (date object)
-
-    # Convert today to a Pandas Series with the same index
-    today_series = pd.Series([today] * len(data), index=data.index)
-
-    # Explicitly extract the date part
-    try:
-        data['Days_Until_Departure'] = (data['Date_of_Journey_Date'] - today_series).dt.days  # Subtract dates
-    except Exception as e:
-        st.error(f"Error calculating Days_Until_Departure: {e}")
-        st.stop()
-
-    data.drop('Date_of_Journey', axis=1, inplace=True, errors='ignore')
-    data.drop('Date_of_Journey_Date', axis=1, inplace=True, errors='ignore')  # Remove the temporary column
+    data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], errors='coerce')
+    data['Journey_Day'] = data['Date_of_Journey'].dt.day
+    data['Journey_Month'] = data['Date_of_Journey'].dt.month
 
     # Remove columns with any NaN values
     data = data.dropna(axis=1, how='any')
@@ -332,7 +289,6 @@ if data is not None:
         y_pred = random_forest_model.predict(X_test)
         mse = mean_squared_error(y_test, y_pred)
         r2 = r2_score(y_test, y_pred)
-
         col1, col2 = st.columns(2)
         with col1:
             st.metric("Mean Squared Error", f"{mse:.2f}")
@@ -341,7 +297,6 @@ if data is not None:
 
         st.subheader("Feature Importance")
         feature_importance = pd.Series(random_forest_model.feature_importances_, index=X.columns).sort_values(ascending=False)
-
         fig_feature_importance, ax_feature_importance = plt.subplots(figsize=(10, 6))
         feature_importance.plot(kind='bar', ax=ax_feature_importance, color="#39A7FF")
         ax_feature_importance.set_title("Feature Importance from Random Forest")
@@ -361,12 +316,14 @@ if data is not None:
         """, unsafe_allow_html=True)
 
         # Input fields using columns for layout
-        col1, col2, col3 = st.columns(3)  # Added a third column
+        col1, col2 = st.columns(2)
         with col1:
             source = st.selectbox("Source", options=list(source_mapping.values()), help="Select the origin city")
             destination = st.selectbox("Destination", options=list(destination_mapping.values()), help="Select the destination city")
             airline = st.selectbox("Airline", options=list(airline_mapping.values()), help="Select the airline")
             stops = st.slider("Number of Stops", min_value=0, max_value=5, value=0, help="Number of layovers")
+            # Cabin Class Input
+            cabin_class = st.selectbox("Cabin Class", options=list(cabin_class_mapping.values()), help="Select the cabin class")
 
         with col2:
             # Use date_input for journey date
@@ -375,12 +332,6 @@ if data is not None:
             dep_minute = st.slider("Departure Minute", min_value=0, max_value=59, value=0, help="Minute of departure")
             arrival_hour = st.slider("Arrival Hour", min_value=0, max_value=23, value=15, help="Hour of arrival")
             arrival_minute = st.slider("Arrival Minute", min_value=0, max_value=59, value=0, help="Minute of arrival")
-
-        with col3:
-            # New inputs
-            cabin_class = st.selectbox("Cabin Class", options=list(cabin_class_mapping.values()), help="Select the cabin class")
-            reference_date = date(2025, 4, 11)
-            days_until_departure = (journey_date - reference_date).days  # Calculate days until departure
 
         st.markdown("<hr>", unsafe_allow_html=True)  # Visual divider
 
@@ -406,8 +357,7 @@ if data is not None:
                 'Arrival_Time_minute': [arrival_minute],
                 'Journey_Day': [journey_day],
                 'Journey_Month': [journey_month],
-                'Cabin_Class': [cabin_class_code],
-                'Days_Until_Departure': [days_until_departure]
+                'Cabin_Class': [cabin_class_code]  # Include Cabin Class
             })
 
             # Ensure all columns from training data are present in input data
@@ -424,13 +374,13 @@ if data is not None:
 
     elif page == "Data Exploration":
         st.header("Explore the Flight Data")
-        st.markdown("Enter your flight details below to get an estimated fare.")
+        st.markdown("Dive into the dataset to understand flight patterns and pricing trends.")
 
-        # Info boxes for guidance
+        # Info box for data exploration
         st.markdown("""
             <div class="info-box">
-                <h3>Flight Details</h3>
-                <p>Provide information about your desired flight to get an accurate prediction.</p>
+                <h3>Data Insights</h3>
+                <p>Explore various visualizations to gain insights into flight prices and related factors.</p>
             </div>
         """, unsafe_allow_html=True)
 
