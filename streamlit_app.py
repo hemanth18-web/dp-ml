@@ -145,7 +145,7 @@ def load_data_from_github(url):
     except requests.exceptions.ConnectionError as e:
         st.error(f"ConnectionError: Could not connect to GitHub. Please check your internet connection.")
         return None
-    except requests.exceptions.Timeout as e:
+    except requests.exceptions.TimeoutError as e:
         st.error(f"TimeoutError: Request to GitHub timed out.")
         return None
     except requests.exceptions.RequestException as e:
@@ -219,7 +219,11 @@ if data is not None:
     data['Duration_minutes'] = data['Duration'].apply(convert_duration_to_minutes)
     data.drop('Duration', axis=1, inplace=True, errors='ignore')
     data.drop('Additional_Info', axis=1, inplace=True, errors='ignore')
+
+    # Cabin Class Mapping
+    cabin_class_mapping = dict(enumerate(data['Cabin_Class'].astype('category').cat.categories))
     data['Cabin_Class'] = data['Cabin_Class'].astype('category').cat.codes
+
     data['Flight_Layover'] = data['Flight_Layover'].astype('category').cat.codes
 
     try:
@@ -241,6 +245,11 @@ if data is not None:
     data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], errors='coerce')
     data['Journey_Day'] = data['Date_of_Journey'].dt.day
     data['Journey_Month'] = data['Date_of_Journey'].dt.month
+
+    # Days Until Departure
+    today = datetime(2025, 4, 11)  # Use today's date as reference
+    data['Days_Until_Departure'] = (data['Date_of_Journey'] - pd.to_datetime(today)).dt.days
+    data.drop('Date_of_Journey', axis=1, inplace=True, errors='ignore')
 
     # Remove columns with any NaN values
     data = data.dropna(axis=1, how='any')
@@ -318,7 +327,7 @@ if data is not None:
         """, unsafe_allow_html=True)
 
         # Input fields using columns for layout
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)  # Added a third column
         with col1:
             source = st.selectbox("Source", options=list(source_mapping.values()), help="Select the origin city")
             destination = st.selectbox("Destination", options=list(destination_mapping.values()), help="Select the destination city")
@@ -333,6 +342,12 @@ if data is not None:
             arrival_hour = st.slider("Arrival Hour", min_value=0, max_value=23, value=15, help="Hour of arrival")
             arrival_minute = st.slider("Arrival Minute", min_value=0, max_value=59, value=0, help="Minute of arrival")
 
+        with col3:
+            # New inputs
+            cabin_class = st.selectbox("Cabin Class", options=list(cabin_class_mapping.values()), help="Select the cabin class")
+            days_until_departure = (journey_date - datetime(2025, 4, 11)).days  # Calculate days until departure
+            #days_until_departure = st.number_input("Days Until Departure", min_value=0, max_value=365, value=30, help="Enter the number of days until departure") # Alternative input
+
         st.markdown("<hr>", unsafe_allow_html=True)  # Visual divider
 
         if st.button("Predict Fare"):
@@ -340,6 +355,7 @@ if data is not None:
             source_code = [k for k, v in source_mapping.items() if v == source][0]
             destination_code = [k for k, v in destination_mapping.items() if v == destination][0]
             airline_code = [k for k, v in airline_mapping.items() if v == airline][0]
+            cabin_class_code = [k for k, v in cabin_class_mapping.items() if v == cabin_class][0]
 
             # Extract day and month from journey_date
             journey_day = journey_date.day
@@ -355,7 +371,9 @@ if data is not None:
                 'Arrival_Time_hour': [arrival_hour],
                 'Arrival_Time_minute': [arrival_minute],
                 'Journey_Day': [journey_day],
-                'Journey_Month': [journey_month]
+                'Journey_Month': [journey_month],
+                'Cabin_Class': [cabin_class_code],
+                'Days_Until_Departure': [days_until_departure]
             })
 
             # Ensure all columns from training data are present in input data
