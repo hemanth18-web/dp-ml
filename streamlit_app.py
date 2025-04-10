@@ -272,9 +272,12 @@ if data is not None:
     # Days Until Departure Calculation (Corrected)
     today = date(2025, 4, 11)  # Use today's date as reference (date object)
 
+    # Convert today to a Pandas Series with the same index
+    today_series = pd.Series([today] * len(data), index=data.index)
+
     # Explicitly extract the date part
     try:
-        data['Days_Until_Departure'] = (data['Date_of_Journey_Date'] - today).dt.days  # Subtract dates
+        data['Days_Until_Departure'] = (data['Date_of_Journey_Date'] - today_series).dt.days  # Subtract dates
     except Exception as e:
         st.error(f"Error calculating Days_Until_Departure: {e}")
         st.stop()
