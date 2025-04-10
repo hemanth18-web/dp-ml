@@ -242,7 +242,12 @@ if data is not None:
     for col in ['Airline', 'Source', 'Destination']:
         data[col] = data[col].astype('category').cat.codes
 
-    data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], errors='coerce')
+    # Date of Journey Conversion with Error Handling
+    try:
+        data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], errors='raise')  # errors='raise' is important
+    except ValueError as e:
+        st.error(f"Error converting 'Date_of_Journey' to datetime: {e}.  Please check the date format in your data.")
+        st.stop()  # Stop execution if date conversion fails
 
     # Days Until Departure Calculation (Corrected)
     today = date(2025, 4, 11)  # Use today's date as reference (date object)
