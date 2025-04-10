@@ -244,9 +244,9 @@ if data is not None:
 
     # Date of Journey Conversion with Error Handling
     try:
-        data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], errors='raise')  # errors='raise' is important
+        data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], format="YOUR_DATE_FORMAT", errors='raise')  # Replace with correct format
     except ValueError as e:
-        st.error(f"Error converting 'Date_of_Journey' to datetime: {e}.  Please check the date format in your data.")
+        st.error(f"Error converting 'Date_of_Journey' to datetime: {e}.  Please check the date format in your data and update the 'format' argument in pd.to_datetime().")
         st.stop()  # Stop execution if date conversion fails
 
     # Days Until Departure Calculation (Corrected)
