@@ -5,6 +5,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import requests
 import io
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.preprocessing import LabelEncoder
 
 # GitHub URL for the dataset
 github_url = "https://raw.githubusercontent.com/hemanth18-web/dp-ml/refs/heads/main/Updated_Flight_Fare_Data%20(20).csv"
@@ -32,7 +36,7 @@ def load_data_from_github(url):
 data = load_data_from_github(github_url)
 
 # --- STREAMLIT APP ---
-st.title("Flight Fare Data Exploration3")
+st.title("Flight Fare Data Exploration and Prediction")
 
 if data is not None:
     # --- Data Cleaning and Conversion ---
@@ -60,12 +64,27 @@ if data is not None:
         # For example, if you want to replace all non-numeric values with 0:
         for val in unique_non_numeric:
             data['Total_Stops'] = data['Total_Stops'].replace(val, 0)
-
     else:
         st.success("No non-numeric values found in 'Total_Stops'")
 
     # Convert 'Total_Stops' to numeric
     data['Total_Stops'] = pd.to_numeric(data['Total_Stops'])
+
+    # Convert Date_of_Journey to datetime
+    data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'])
+
+    # Extract features: day, month
+    data['Journey_Day'] = data['Date_of_Journey'].dt.day
+    data['Journey_Month'] = data['Date_of_Journey'].dt.month
+
+    # Convert Dep_Time and Arrival_Time to datetime objects and extract features
+    data['Dep_Time'] = pd.to_datetime(data['Dep_Time'], errors='coerce')
+    data['Arrival_Time'] = pd.to_datetime(data['Arrival_Time'], errors='coerce')
+
+    data['Dep_Time_Hour'] = data['Dep_Time'].dt.hour
+    data['Dep_Time_Minute'] = data['Dep_Time'].dt.minute
+    data['Arrival_Time_Hour'] = data['Arrival_Time'].dt.hour
+    data['Arrival_Time_Minute'] = data['Arrival_Time'].dt.minute
 
     st.header("Data Preview")
     st.dataframe(data.head())
@@ -176,6 +195,88 @@ if data is not None:
     ax_boxplot_airline.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
     fig_boxplot_airline.tight_layout()
     st.pyplot(fig_boxplot_airline)
+
+    # --- Feature Engineering and Preprocessing for Model ---
+    # Convert categorical features to numerical using Label Encoding
+    le = LabelEncoder()
+    data['Airline'] = le.fit_transform(data['Airline'])
+    data['Source'] = le.fit_transform(data['Source'])
+    data['Destination'] = le.fit_transform(data['Destination'])
+    data['Cabin_Class'] = le.fit_transform(data['Cabin_Class'])
+
+    # Prepare data for model training
+    print(data.columns)  # VERY IMPORTANT: Print column names to debug
+    X = data[['Airline', 'Source', 'Destination', 'Total_Stops', 'Dep_Time_Hour', 'Dep_Time_Minute',
+              'Arrival_Time_Hour', 'Arrival_Time_Minute', 'Duration_Hours', 'Duration_Minutes',
+              'Journey_Day', 'Journey_Month', 'Cabin_Class', 'Days_Until_Departure']]  # Include all features
+    y = data['Price']
+
+    # Split data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # --- Model Training ---
+    st.header("Random Forest Model Training")
+    random_forest_model = RandomForestRegressor(n_estimators=100, random_state=42)
+    random_forest_model.fit(X_train, y_train)
+
+    # --- Model Evaluation ---
+    y_pred = random_forest_model.predict(X_test)
+    mse = mean_squared_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred)
+    st.write(f"Mean Squared Error: {mse:.2f}")
+    st.write(f"R^2 Score: {r2:.2f}")
+
+    # --- Feature Importance Plot ---
+    st.subheader("Feature Importance")
+    feature_importance = pd.Series(random_forest_model.feature_importances_, index=X.columns).sort_values(ascending=False)
+    fig_feature_importance, ax_feature_importance = plt.subplots(figsize=(10, 6))
+    feature_importance.plot(kind='bar', ax=ax_feature_importance)
+    ax_feature_importance.set_title("Feature Importance from Random Forest")
+    ax_feature_importance.set_ylabel("Importance Score")
+    st.pyplot(fig_feature_importance)
+
+    # --- Prediction Form ---
+    st.header("Flight Price Prediction")
+
+    # User input fields
+    source = st.selectbox("Source", options=data['Source'].unique())
+    destination = st.selectbox("Destination", options=data['Destination'].unique())
+    stops = st.slider("Number of Stops", min_value=0, max_value=5, value=0)
+    airline = st.selectbox("Airline", options=data['Airline'].unique())
+    dep_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=12)
+    dep_minute = st.slider("Departure Minute", min_value=0, max_value=59, value=0)
+    arrival_hour = st.slider("Arrival Hour", min_value=0, max_value=23, value=14)
+    arrival_minute = st.slider("Arrival Minute", min_value=0, max_value=59, value=0)
+    duration_hours = st.slider("Duration Hours", min_value=0, max_value=24, value=2)
+    duration_minutes = st.slider("Duration Minutes", min_value=0, max_value=59, value=0)
+    journey_day = st.slider("Journey Day", min_value=1, max_value=31, value=15)
+    journey_month = st.slider("Journey Month", min_value=1, max_value=12, value=3)
+    cabin_class = st.selectbox("Cabin Class", options=data['Cabin_Class'].unique())
+    days_until_departure = st.slider("Days Until Departure", min_value=1, max_value=365, value=30)
+
+    # Prediction button
+    if st.button("Predict Price"):
+        # Prepare input data
+        input_data = pd.DataFrame({
+            'Airline': [airline],
+            'Source': [source],
+            'Destination': [destination],
+            'Total_Stops': [stops],
+            'Dep_Time_Hour': [dep_hour],
+            'Dep_Time_Minute': [dep_minute],
+            'Arrival_Time_Hour': [arrival_hour],
+            'Arrival_Time_Minute': [arrival_minute],
+            'Duration_Hours': [duration_hours],
+            'Duration_Minutes': [duration_minutes],
+            'Journey_Day': [journey_day],
+            'Journey_Month': [journey_month],
+            'Cabin_Class': [cabin_class],
+            'Days_Until_Departure': [days_until_departure]
+        })
+
+        # Make prediction
+        prediction = random_forest_model.predict(input_data)
+        st.success(f"Predicted Flight Price: ₹{prediction[0]:.2f}")
 
 else:
     st.write("Failed to load data.  Check the GitHub URL and your internet connection.")
