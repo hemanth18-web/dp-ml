@@ -37,14 +37,12 @@ def load_data_from_github(url):
 data = load_data_from_github(github_url)
 
 # --- STREAMLIT APP ---
-st.title("Flight Fare Data Exploration and Prediction55")
+st.title("Flight Fare Data Exploration and Prediction")
 
 if data is not None:
     # --- Data Cleaning and Conversion ---
-
     # Replace "non-stop" with 0
     data['Total_Stops'] = data['Total_Stops'].replace("non-stop", 0)
-
     # Handle missing values (NaN)
     data['Total_Stops'] = data['Total_Stops'].replace('NaN', np.nan)  # Replace string 'NaN' with actual NaN
     data['Total_Stops'] = data['Total_Stops'].fillna(0)  # Fill NaN with 0 (or another appropriate value)
@@ -57,9 +55,7 @@ if data is not None:
             return len(stops.split('→'))  # Count the number of stops based on '→'
         else:
             return 0  # Default to 0 for unknown values
-
     data['Total_Stops'] = data['Total_Stops'].astype(str).apply(convert_stops_to_numeric) # Convert to string first to handle mixed types
-
     # Convert 'Total_Stops' to numeric *after* cleaning
     data['Total_Stops'] = pd.to_numeric(data['Total_Stops'], errors='coerce').fillna(0)
 
@@ -67,14 +63,11 @@ if data is not None:
     try:
         # Attempt to convert 'Dep_Time' to datetime objects
         data['Dep_Time'] = pd.to_datetime(data['Dep_Time'], errors='coerce')
-
         # Extract hour and minute
         data['Dep_Time_hour'] = data['Dep_Time'].dt.hour
         data['Dep_Time_minute'] = data['Dep_Time'].dt.minute
-
         # Drop the original 'Dep_Time' column
         data.drop('Dep_Time', axis=1, inplace=True, errors='ignore')  # Use errors='ignore'
-
     except Exception as e:
         st.error(f"Error processing 'Dep_Time' column: {e}")
 
@@ -82,14 +75,11 @@ if data is not None:
     try:
         # Attempt to convert 'Arrival_Time' to datetime objects
         data['Arrival_Time'] = pd.to_datetime(data['Arrival_Time'], errors='coerce')
-
         # Extract hour and minute
         data['Arrival_Time_hour'] = data['Arrival_Time'].dt.hour
         data['Arrival_Time_minute'] = data['Arrival_Time'].dt.minute
-
         # Drop the original 'Arrival_Time' column
         data.drop('Arrival_Time', axis=1, inplace=True, errors='ignore')  # Use errors='ignore'
-
     except Exception as e:
         st.error(f"Error processing 'Arrival_Time' column: {e}")
 
@@ -106,7 +96,6 @@ if data is not None:
                 # Handle cases where only hours or minutes are present
                 match_hours = re.match(r'(\d+)h', str(duration))
                 match_minutes = re.match(r'(\d+)m', str(duration))
-
                 if match_hours:
                     hours = int(match_hours.group(1))
                     return hours * 60
@@ -117,7 +106,6 @@ if data is not None:
                     return 0  # Default to 0 if no match
         except:
             return 0  # Handle any unexpected errors
-
     data['Duration_minutes'] = data['Duration'].apply(convert_duration_to_minutes)
     data.drop('Duration', axis=1, inplace=True, errors='ignore')
 
@@ -125,6 +113,8 @@ if data is not None:
     data.drop('Additional_Info', axis=1, inplace=True, errors='ignore')
 
     # **Handle Cabin_Class Column**
+    # Store original values for mapping in prediction
+    cabin_class_mapping = dict(enumerate(data['Cabin_Class'].astype('category').cat.categories))
     data['Cabin_Class'] = data['Cabin_Class'].astype('category').cat.codes
 
     # **Handle Flight_Layover Column**
@@ -141,7 +131,6 @@ if data is not None:
         st.error(f"Error processing 'Booking_Date' column: {e}")
 
     # --- Feature Engineering and Encoding ---
-
     # Store original values for mapping in prediction
     airline_mapping = dict(enumerate(data['Airline'].astype('category').cat.categories))
     source_mapping = dict(enumerate(data['Source'].astype('category').cat.categories))
@@ -210,13 +199,12 @@ if data is not None:
 
     # --- Prediction Interface ---
     st.header("Flight Fare Prediction")
-    # Input fields
 
+    # Input fields
     # Use original names in selectboxes
     source = st.selectbox("Source", options=list(source_mapping.values()))
     destination = st.selectbox("Destination", options=list(destination_mapping.values()))
     airline = st.selectbox("Airline", options=list(airline_mapping.values()))
-
     stops = st.slider("Number of Stops", min_value=0, max_value=5, value=1)
     dep_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=10)
     dep_minute = st.slider("Departure Minute", min_value=0, max_value=59, value=30)
@@ -225,14 +213,18 @@ if data is not None:
     journey_day = st.slider("Journey Day", min_value=1, max_value=31, value=15)
     journey_month = st.slider("Journey Month", min_value=1, max_value=12, value=3)
 
+    # ADDED INPUTS
+    cabin_class = st.selectbox("Cabin Class", options=list(cabin_class_mapping.values()))
+    days_until_departure = st.slider("Days Until Departure", min_value=1, max_value=365, value=30)
+
     # Prediction button
     if st.button("Predict Fare"):
         # Prepare input data
-
         # Map names back to numerical codes
         source_code = [k for k, v in source_mapping.items() if v == source][0]
         destination_code = [k for k, v in destination_mapping.items() if v == destination][0]
         airline_code = [k for k, v in airline_mapping.items() if v == airline][0]
+        cabin_class_code = [k for k, v in cabin_class_mapping.items() if v == cabin_class][0]
 
         input_data = pd.DataFrame({
             'Airline': [airline_code],
@@ -244,13 +236,16 @@ if data is not None:
             'Arrival_Time_hour': [arrival_hour],
             'Arrival_Time_minute': [arrival_minute],
             'Journey_Day': [journey_day],
-            'Journey_Month': [journey_month]
+            'Journey_Month': [journey_month],
+            'Cabin_Class': [cabin_class_code],  # ADDED
+            'Days_Until_Departure': [days_until_departure] # ADDED
         })
 
         # Ensure the input data has the same columns as the training data
         for col in X_train.columns:
             if col not in input_data.columns:
                 input_data[col] = 0  # Or some other appropriate default value
+
         input_data = input_data[X_train.columns]  # Ensure correct column order
 
         # Make prediction
@@ -265,6 +260,7 @@ if data is not None:
 
     # --- VISUALIZATIONS ---
     st.header("Visualizations")
+
     # Airline Distribution
     st.subheader("Airline Distribution")
     fig_airline, ax_airline = plt.subplots(figsize=(10, 6))
@@ -364,5 +360,6 @@ if data is not None:
     ax_boxplot_airline.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
     fig_boxplot_airline.tight_layout()
     st.pyplot(fig_boxplot_airline)
+
 else:
     st.write("Failed to load data.  Check the GitHub URL and your internet connection.")
