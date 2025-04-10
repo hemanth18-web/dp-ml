@@ -217,12 +217,6 @@ if data is not None:
     data.drop('Duration', axis=1, inplace=True, errors='ignore')
     data.drop('Additional_Info', axis=1, inplace=True, errors='ignore')
 
-    # No longer convert to numerical codes here
-    # data['Cabin_Class'] = data['Cabin_Class'].astype('category').cat.codes
-    # data['Airline'] = data['Airline'].astype('category').cat.codes
-    # data['Source'] = data['Source'].astype('category').cat.codes
-    # data['Destination'] = data['Destination'].astype('category').cat.codes
-
     data['Flight_Layover'] = data['Flight_Layover'].astype('category').cat.codes
     try:
         data['Booking_Date'] = pd.to_datetime(data['Booking_Date'], errors='coerce')
@@ -240,21 +234,29 @@ if data is not None:
     # Remove columns with any NaN values
     data = data.dropna(axis=1, how='any')
 
-    # Attempt to convert all columns to numeric, except the specified string columns
-    for col in data.columns:
-        if col not in ['Airline', 'Source', 'Destination', 'Cabin_Class']:
-            try:
-                data[col] = pd.to_numeric(data[col])
-            except ValueError:
-                st.error(f"Could not convert column '{col}' to numeric.  Please investigate.")
-                st.stop()
+    # Create mappings for encoding
+    airline_mapping = dict(enumerate(data['Airline'].astype('category').cat.categories))
+    source_mapping = dict(enumerate(data['Source'].astype('category').cat.categories))
+    destination_mapping = dict(enumerate(data['Destination'].astype('category').cat.categories))
+    cabin_class_mapping = dict(enumerate(data['Cabin_Class'].astype('category').cat.categories))
 
-    # --- Model Training ---
-    # One-Hot Encode Categorical Variables
-    data = pd.get_dummies(data, columns=['Airline', 'Source', 'Destination', 'Cabin_Class'], drop_first=True)
+    # Create a copy of the data for the model, where we'll encode
+    model_data = data.copy()
 
-    X = data.drop(['Price'], axis=1, errors='ignore')
-    y = data['Price']
+    # Encode the categorical columns in the model data
+    for col, mapping in zip(['Airline', 'Source', 'Destination', 'Cabin_Class'], [airline_mapping, source_mapping, destination_mapping, cabin_class_mapping]):
+        model_data[col] = model_data[col].map(lambda x: list(mapping.keys())[list(mapping.values()).index(x)])
+
+    # Attempt to convert all columns to numeric
+    for col in model_data.columns:
+        try:
+            model_data[col] = pd.to_numeric(model_data[col])
+        except ValueError:
+            st.error(f"Could not convert column '{col}' to numeric.  Please investigate.")
+            st.stop()
+
+    X = model_data.drop(['Price'], axis=1, errors='ignore')
+    y = model_data['Price']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     @st.cache_resource  # Use cache_resource for models
@@ -350,13 +352,13 @@ if data is not None:
                 'Arrival_Time_minute': [arrival_minute],
                 'Journey_Day': [journey_date.day],
                 'Journey_Month': [journey_date.month],
-                'Airline_' + airline: [1],  # One-Hot Encode
-                'Source_' + source: [1],    # One-Hot Encode
-                'Destination_' + destination: [1],  # One-Hot Encode
-                'Cabin_Class_' + cabin_class: [1]   # One-Hot Encode
+                'Airline': [list(airline_mapping.keys())[list(airline_mapping.values()).index(airline)]],
+                'Source': [list(source_mapping.keys())[list(source_mapping.values()).index(source)]],
+                'Destination': [list(destination_mapping.keys())[list(destination_mapping.values()).index(destination)]],
+                'Cabin_Class': [list(cabin_class_mapping.keys())[list(cabin_class_mapping.values()).index(cabin_class)]]
             })
 
-            # Add missing columns and ensure correct order
+            # Ensure all columns from training data are present in input data
             for col in X_train.columns:
                 if col not in input_data.columns:
                     input_data[col] = 0
