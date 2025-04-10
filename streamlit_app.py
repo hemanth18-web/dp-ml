@@ -244,19 +244,36 @@ if data is not None:
 
     # Date of Journey Conversion with Error Handling
     try:
+        # First, try converting to datetime
         data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], format="%Y-%m-%d %H:%M:%S", errors='raise')
-        st.write(f"Date_of_Journey dtype after conversion: {data['Date_of_Journey'].dtype}")  # Debugging print
+        st.write(f"Date_of_Journey dtype after initial conversion: {data['Date_of_Journey'].dtype}")
+
+        # Then, explicitly extract the date
+        data['Date_of_Journey_Date'] = data['Date_of_Journey'].dt.date
+        st.write(f"Date_of_Journey_Date dtype: {data['Date_of_Journey_Date'].dtype}")
+
+        # Check if the conversion was successful
+        if not pd.api.types.is_datetime64_any_dtype(data['Date_of_Journey']):
+            st.error("Date_of_Journey was not successfully converted to datetime.")
+            st.stop()
+
+        # Check if the date extraction was successful
+        if not pd.api.types.is_object_dtype(data['Date_of_Journey_Date']):
+            st.error("Date_of_Journey_Date was not successfully converted to date.")
+            st.stop()
+
     except ValueError as e:
         st.error(f"Error converting 'Date_of_Journey' to datetime: {e}.  Please check the date format in your data and update the 'format' argument in pd.to_datetime().")
         st.stop()  # Stop execution if date conversion fails
+    except AttributeError as e:
+        st.error(f"Error extracting date from 'Date_of_Journey': {e}.  This likely means 'Date_of_Journey' is not a datetime column.")
+        st.stop()
 
     # Days Until Departure Calculation (Corrected)
     today = date(2025, 4, 11)  # Use today's date as reference (date object)
 
     # Explicitly extract the date part
     try:
-        data['Date_of_Journey_Date'] = data['Date_of_Journey'].dt.date
-        st.write(f"Date_of_Journey_Date dtype: {data['Date_of_Journey_Date'].dtype}")  # Debugging print
         data['Days_Until_Departure'] = (data['Date_of_Journey_Date'] - today).dt.days  # Subtract dates
     except Exception as e:
         st.error(f"Error calculating Days_Until_Departure: {e}")
