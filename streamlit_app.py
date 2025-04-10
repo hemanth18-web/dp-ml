@@ -243,12 +243,11 @@ if data is not None:
         data[col] = data[col].astype('category').cat.codes
 
     data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], errors='coerce')
-    data['Journey_Day'] = data['Date_of_Journey'].dt.day
-    data['Journey_Month'] = data['Date_of_Journey'].dt.month
 
-    # Days Until Departure
+    # Days Until Departure Calculation (Corrected)
     today = date(2025, 4, 11)  # Use today's date as reference (date object)
-    data['Days_Until_Departure'] = (data['Date_of_Journey'] - pd.to_datetime(today).date()).dt.days
+    data['Days_Until_Departure'] = (data['Date_of_Journey'].dt.date - today).dt.days  # Subtract dates
+
     data.drop('Date_of_Journey', axis=1, inplace=True, errors='ignore')
 
     # Remove columns with any NaN values
