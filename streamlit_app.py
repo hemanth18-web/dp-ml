@@ -5,14 +5,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import requests
 import io
-from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
-import pickle
-import re  # Import the regular expression module
+from sklearn.preprocessing import LabelEncoder
 
 # GitHub URL for the dataset
 github_url = "https://raw.githubusercontent.com/hemanth18-web/dp-ml/refs/heads/main/Updated_Flight_Fare_Data%20(20).csv"
+
 
 # Function to load the dataset from GitHub
 @st.cache_data
@@ -43,217 +43,53 @@ if data is not None:
     # --- Data Cleaning and Conversion ---
     # Replace "non-stop" with 0
     data['Total_Stops'] = data['Total_Stops'].replace("non-stop", 0)
+
     # Handle missing values (NaN)
     data['Total_Stops'] = data['Total_Stops'].replace('NaN', np.nan)  # Replace string 'NaN' with actual NaN
     data['Total_Stops'] = data['Total_Stops'].fillna(0)  # Fill NaN with 0 (or another appropriate value)
 
-    # **Correctly Handle Non-Numeric Values in Total_Stops**
-    def convert_stops_to_numeric(stops):
-        if isinstance(stops, (int, float)):  # Check if already numeric
-            return stops
-        elif isinstance(stops, str) and '→' in stops:
-            return len(stops.split('→'))  # Count the number of stops based on '→'
-        else:
-            return 0  # Default to 0 for unknown values
-    data['Total_Stops'] = data['Total_Stops'].astype(str).apply(convert_stops_to_numeric) # Convert to string first to handle mixed types
-    # Convert 'Total_Stops' to numeric *after* cleaning
-    data['Total_Stops'] = pd.to_numeric(data['Total_Stops'], errors='coerce').fillna(0)
-
-    # **Handle Dep_Time Column**
-    try:
-        # Attempt to convert 'Dep_Time' to datetime objects
-        data['Dep_Time'] = pd.to_datetime(data['Dep_Time'], errors='coerce')
-        # Extract hour and minute
-        data['Dep_Time_hour'] = data['Dep_Time'].dt.hour
-        data['Dep_Time_minute'] = data['Dep_Time'].dt.minute
-        # Drop the original 'Dep_Time' column
-        data.drop('Dep_Time', axis=1, inplace=True, errors='ignore')  # Use errors='ignore'
-    except Exception as e:
-        st.error(f"Error processing 'Dep_Time' column: {e}")
-
-    # **Handle Arrival_Time Column**
-    try:
-        # Attempt to convert 'Arrival_Time' to datetime objects
-        data['Arrival_Time'] = pd.to_datetime(data['Arrival_Time'], errors='coerce')
-        # Extract hour and minute
-        data['Arrival_Time_hour'] = data['Arrival_Time'].dt.hour
-        data['Arrival_Time_minute'] = data['Arrival_Time'].dt.minute
-        # Drop the original 'Arrival_Time' column
-        data.drop('Arrival_Time', axis=1, inplace=True, errors='ignore')  # Use errors='ignore'
-    except Exception as e:
-        st.error(f"Error processing 'Arrival_Time' column: {e}")
-
-    # **Handle Duration Column**
-    def convert_duration_to_minutes(duration):
+    # --- Identify Non-Convertible Values ---
+    def is_number(value):
         try:
-            # Use regular expression to extract hours and minutes
-            match = re.match(r'(\d+)h\s*(\d+)m', str(duration))  # Added str() conversion
-            if match:
-                hours = int(match.group(1))
-                minutes = int(match.group(2))
-                return hours * 60 + minutes
-            else:
-                # Handle cases where only hours or minutes are present
-                match_hours = re.match(r'(\d+)h', str(duration))
-                match_minutes = re.match(r'(\d+)m', str(duration))
-                if match_hours:
-                    hours = int(match_hours.group(1))
-                    return hours * 60
-                elif match_minutes:
-                    minutes = int(match_minutes.group(1))
-                    return minutes
-                else:
-                    return 0  # Default to 0 if no match
-        except:
-            return 0  # Handle any unexpected errors
-    data['Duration_minutes'] = data['Duration'].apply(convert_duration_to_minutes)
-    data.drop('Duration', axis=1, inplace=True, errors='ignore')
+            float(value)
+            return True
+        except ValueError:
+            return False
 
-    # **Handle Additional_Info Column**
-    data.drop('Additional_Info', axis=1, inplace=True, errors='ignore')
+    non_numeric_values = data['Total_Stops'][data['Total_Stops'].apply(lambda x: not is_number(x))]
+    unique_non_numeric = non_numeric_values.unique()
 
-    # **Handle Cabin_Class Column**
-    # Store original values for mapping in prediction
-    cabin_class_mapping = dict(enumerate(data['Cabin_Class'].astype('category').cat.categories))
-    data['Cabin_Class'] = data['Cabin_Class'].astype('category').cat.codes
+    if len(unique_non_numeric) > 0:
+        st.warning(f"Found non-numeric values in 'Total_Stops': {unique_non_numeric}")
+        # Replace these values with a suitable numeric value (e.g., 0) or NaN
+        # For example, if you want to replace all non-numeric values with 0:
+        for val in unique_non_numeric:
+            data['Total_Stops'] = data['Total_Stops'].replace(val, 0)
+    else:
+        st.success("No non-numeric values found in 'Total_Stops'")
 
-    # **Handle Flight_Layover Column**
-    data['Flight_Layover'] = data['Flight_Layover'].astype('category').cat.codes
+    # Convert 'Total_Stops' to numeric
+    data['Total_Stops'] = pd.to_numeric(data['Total_Stops'])
 
-    # **Handle Booking_Date Column**
-    try:
-        data['Booking_Date'] = pd.to_datetime(data['Booking_Date'], errors='coerce')
-        data['Booking_Day'] = data['Booking_Date'].dt.day
-        data['Booking_Month'] = data['Booking_Date'].dt.month
-        data['Booking_Year'] = data['Booking_Date'].dt.year  # Extract year as well
-        data.drop('Booking_Date', axis=1, inplace=True, errors='ignore')
-    except Exception as e:
-        st.error(f"Error processing 'Booking_Date' column: {e}")
+    # Convert Date_of_Journey to datetime
+    data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'])
 
-    # --- Feature Engineering and Encoding ---
-    # Store original values for mapping in prediction
-    airline_mapping = dict(enumerate(data['Airline'].astype('category').cat.categories))
-    source_mapping = dict(enumerate(data['Source'].astype('category').cat.categories))
-    destination_mapping = dict(enumerate(data['Destination'].astype('category').cat.categories))
-
-    # Convert categorical features to numerical
-    for col in ['Airline', 'Source', 'Destination']:
-        data[col] = data[col].astype('category').cat.codes
-
-    # Extract date features
-    data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], errors='coerce') # Handle potential parsing errors
+    # Extract features: day, month
     data['Journey_Day'] = data['Date_of_Journey'].dt.day
     data['Journey_Month'] = data['Date_of_Journey'].dt.month
-    data.drop('Date_of_Journey', axis=1, inplace=True)
 
-    # --- Data Preparation for Modeling ---
-    # Drop any columns with non-finite values (NaN, inf, -inf)
-    data = data.dropna(axis=1, how='any')
+    # Convert Dep_Time and Arrival_Time to datetime objects and extract features
+    data['Dep_Time'] = pd.to_datetime(data['Dep_Time'], errors='coerce')
+    data['Arrival_Time'] = pd.to_datetime(data['Arrival_Time'], errors='coerce')
 
-    # **General Column Check**
-    for col in data.columns:
-        st.write(f"Column: {col}")
-        st.write(f"  Data Type: {data[col].dtype}")
-        st.write(f"  Unique Values: {data[col].nunique()}")
-        #st.write(f"  First 5 Values: {data[col].head().to_list()}") # Print first 5 values
-        try:
-            st.write(f"  Min: {data[col].min()}, Max: {data[col].max()}")
-        except:
-            st.write("  Cannot calculate min/max for this data type.")
-        st.write("-" * 30)
-
-    # Ensure all columns are numeric
-    for col in data.columns:
-        try:
-            data[col] = pd.to_numeric(data[col])
-        except ValueError:
-            st.error(f"Could not convert column '{col}' to numeric.  Please investigate.")
-            st.stop()  # Stop execution if a column cannot be converted
-
-    X = data.drop(['Price'], axis=1, errors='ignore') # Ignore if 'Price' is already dropped
-    y = data['Price']
-
-    # Split data into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    # --- Model Training ---
-    st.header("Random Forest Model Training")
-    random_forest_model = RandomForestRegressor(n_estimators=100, random_state=42)
-    random_forest_model.fit(X_train, y_train)
-
-    # --- Model Evaluation ---
-    y_pred = random_forest_model.predict(X_test)
-    mse = mean_squared_error(y_test, y_pred)
-    r2 = r2_score(y_test, y_pred)
-    st.write(f"Mean Squared Error: {mse:.2f}")
-    st.write(f"R^2 Score: {r2:.2f}")
-
-    # --- Feature Importance Plot ---
-    st.subheader("Feature Importance")
-    feature_importance = pd.Series(random_forest_model.feature_importances_, index=X.columns).sort_values(ascending=False)
-    fig_feature_importance, ax_feature_importance = plt.subplots(figsize=(10, 6))
-    feature_importance.plot(kind='bar', ax=ax_feature_importance)
-    ax_feature_importance.set_title("Feature Importance from Random Forest")
-    ax_feature_importance.set_ylabel("Importance Score")
-    st.pyplot(fig_feature_importance)
-
-    # --- Prediction Interface ---
-    st.header("Flight Fare Prediction")
-
-    # Input fields
-    # Use original names in selectboxes
-    source = st.selectbox("Source", options=list(source_mapping.values()))
-    destination = st.selectbox("Destination", options=list(destination_mapping.values()))
-    airline = st.selectbox("Airline", options=list(airline_mapping.values()))
-    stops = st.slider("Number of Stops", min_value=0, max_value=5, value=1)
-    dep_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=10)
-    dep_minute = st.slider("Departure Minute", min_value=0, max_value=59, value=30)
-    arrival_hour = st.slider("Arrival Hour", min_value=0, max_value=23, value=13)
-    arrival_minute = st.slider("Arrival Minute", min_value=0, max_value=59, value=45)
-    journey_day = st.slider("Journey Day", min_value=1, max_value=31, value=15)
-    journey_month = st.slider("Journey Month", min_value=1, max_value=12, value=3)
-
-    # ADDED INPUTS
-    cabin_class = st.selectbox("Cabin Class", options=list(cabin_class_mapping.values()))
-    days_until_departure = st.slider("Days Until Departure", min_value=1, max_value=365, value=30)
-
-    # Prediction button
-    if st.button("Predict Fare"):
-        # Prepare input data
-        # Map names back to numerical codes
-        source_code = [k for k, v in source_mapping.items() if v == source][0]
-        destination_code = [k for k, v in destination_mapping.items() if v == destination][0]
-        airline_code = [k for k, v in airline_mapping.items() if v == airline][0]
-        cabin_class_code = [k for k, v in cabin_class_mapping.items() if v == cabin_class][0]
-
-        input_data = pd.DataFrame({
-            'Airline': [airline_code],
-            'Source': [source_code],
-            'Destination': [destination_code],
-            'Total_Stops': [stops],
-            'Dep_Time_hour': [dep_hour],
-            'Dep_Time_minute': [dep_minute],
-            'Arrival_Time_hour': [arrival_hour],
-            'Arrival_Time_minute': [arrival_minute],
-            'Journey_Day': [journey_day],
-            'Journey_Month': [journey_month],
-            'Cabin_Class': [cabin_class_code],  # ADDED
-            'Days_Until_Departure': [days_until_departure] # ADDED
-        })
-
-        # Ensure the input data has the same columns as the training data
-        for col in X_train.columns:
-            if col not in input_data.columns:
-                input_data[col] = 0  # Or some other appropriate default value
-
-        input_data = input_data[X_train.columns]  # Ensure correct column order
-
-        # Make prediction
-        predicted_fare = random_forest_model.predict(input_data)[0]
-        st.success(f"Predicted Flight Fare: ₹{predicted_fare:.2f}")
+    data['Dep_Time_Hour'] = data['Dep_Time'].dt.hour
+    data['Dep_Time_Minute'] = data['Dep_Time'].dt.minute
+    data['Arrival_Time_Hour'] = data['Arrival_Time'].dt.hour
+    data['Arrival_Time_Minute'] = data['Arrival_Time'].dt.minute
 
     st.header("Data Preview")
     st.dataframe(data.head())
+
     st.header("Data Summary")
     st.write(f"Number of rows: {data.shape[0]}")
     st.write(f"Number of columns: {data.shape[1]}")
@@ -360,6 +196,130 @@ if data is not None:
     ax_boxplot_airline.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
     fig_boxplot_airline.tight_layout()
     st.pyplot(fig_boxplot_airline)
+
+    # --- Feature Engineering and Preprocessing for Model ---
+    # Use original string values for 'Airline', 'Source', 'Destination', 'Cabin_Class'
+    # No Label Encoding here
+
+    # Print column names for debugging
+    print("Column Names Before Feature Selection:")
+    print(data.columns)
+
+    # Prepare data for model training
+    # Ensure all required columns exist.  If 'Duration_Hours' or 'Duration_Minutes' are missing, calculate them.
+    if 'Duration_Hours' not in data.columns or 'Duration_Minutes' not in data.columns:
+        data['Duration'] = (data['Arrival_Time'] - data['Dep_Time']).dt.total_seconds() / 60  # Duration in minutes
+        data['Duration_Hours'] = data['Duration'] // 60
+        data['Duration_Minutes'] = data['Duration'] % 60
+
+    # Select features, handling potential missing columns
+    features = ['Total_Stops', 'Dep_Time_Hour', 'Dep_Time_Minute',
+                'Arrival_Time_Hour', 'Arrival_Time_Minute', 'Duration_Hours', 'Duration_Minutes',
+                'Journey_Day', 'Journey_Month', 'Days_Until_Departure', 'Airline', 'Source', 'Destination', 'Cabin_Class']
+
+    # Check if all features exist in the DataFrame
+    missing_features = [f for f in features if f not in data.columns]
+    if missing_features:
+        st.error(f"Missing features: {missing_features}.  Please check your data.")
+        st.stop()  # Stop execution if features are missing
+
+    # One-Hot Encode Categorical Features
+    data = pd.get_dummies(data, columns=['Airline', 'Source', 'Destination', 'Cabin_Class'], drop_first=True)
+
+    # Update the features list to include the one-hot encoded columns
+    features = [col for col in data.columns if col not in ['Price', 'Date_of_Journey', 'Dep_Time', 'Arrival_Time', 'Duration']]  # Exclude non-feature columns
+
+    X = data[features]
+    y = data['Price']
+
+    # Split data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # --- Print data types and missing values for debugging ---
+    print("Data types of X_train columns:")
+    print(X_train.dtypes)
+    print("Number of missing values in X_train:")
+    print(X_train.isnull().sum())
+
+    # --- Handle missing values (if any) ---
+    X_train = X_train.fillna(X_train.mean())  # Impute missing values with the mean
+    X_test = X_test.fillna(X_test.mean())
+
+    # --- Model Training ---
+    st.header("Random Forest Model Training")
+    random_forest_model = RandomForestRegressor(n_estimators=100, random_state=42)
+    random_forest_model.fit(X_train, y_train)
+
+    # --- Model Evaluation ---
+    y_pred = random_forest_model.predict(X_test)
+    mse = mean_squared_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred)
+    st.write(f"Mean Squared Error: {mse:.2f}")
+    st.write(f"R^2 Score: {r2:.2f}")
+
+    # --- Feature Importance Plot ---
+    st.subheader("Feature Importance")
+    feature_importance = pd.Series(random_forest_model.feature_importances_, index=X.columns).sort_values(ascending=False)
+    fig_feature_importance, ax_feature_importance = plt.subplots(figsize=(10, 6))
+    feature_importance.plot(kind='bar', ax=ax_feature_importance)
+    ax_feature_importance.set_title("Feature Importance from Random Forest")
+    ax_feature_importance.set_ylabel("Importance Score")
+    st.pyplot(fig_feature_importance)
+
+    # --- Prediction Form ---
+    st.header("Flight Price Prediction")
+
+    # Get unique values for selectboxes
+    # Extract base column names before one-hot encoding
+    unique_airlines = data.columns[data.columns.str.startswith('Airline_')].str.replace('Airline_', '').tolist()
+    unique_sources = data.columns[data.columns.str.startswith('Source_')].str.replace('Source_', '').tolist()
+    unique_destinations = data.columns[data.columns.str.startswith('Destination_')].str.replace('Destination_', '').tolist()
+    unique_cabin_classes = data.columns[data.columns.str.startswith('Cabin_Class_')].str.replace('Cabin_Class_', '').tolist()
+
+    # User input fields
+    source = st.selectbox("Source", options=unique_sources)
+    destination = st.selectbox("Destination", options=unique_destinations)
+    stops = st.slider("Number of Stops", min_value=0, max_value=5, value=0)
+    airline = st.selectbox("Airline", options=unique_airlines)
+    dep_hour = st.slider("Departure Hour", min_value=0, max_value=23, value=12)
+    dep_minute = st.slider("Departure Minute", min_value=0, max_value=59, value=0)
+    arrival_hour = st.slider("Arrival Hour", min_value=0, max_value=23, value=14)
+    arrival_minute = st.slider("Arrival Minute", min_value=0, max_value=59, value=0)
+    duration_hours = st.slider("Duration Hours", min_value=0, max_value=24, value=2)
+    duration_minutes = st.slider("Duration Minutes", min_value=0, max_value=59, value=0)
+    journey_day = st.slider("Journey Day", min_value=1, max_value=31, value=15)
+    journey_month = st.slider("Journey Month", min_value=1, max_value=12, value=3)
+    cabin_class = st.selectbox("Cabin Class", options=unique_cabin_classes)
+    days_until_departure = st.slider("Days Until Departure", min_value=1, max_value=365, value=30)
+
+    # Prediction button
+    if st.button("Predict Price"):
+        # Prepare input data
+        input_data = {}
+        for feature in features:
+            input_data[feature] = [0]  # Initialize all features to 0
+
+        # Set the values for the user-selected features
+        input_data[f'Airline_{airline}'] = [1]  # Set the selected airline to 1
+        input_data[f'Source_{source}'] = [1]  # Set the selected source to 1
+        input_data[f'Destination_{destination}'] = [1]  # Set the selected destination to 1
+        input_data[f'Cabin_Class_{cabin_class}'] = [1]  # Set the selected cabin class to 1
+        input_data['Total_Stops'] = [stops]
+        input_data['Dep_Time_Hour'] = [dep_hour]
+        input_data['Dep_Time_Minute'] = [dep_minute]
+        input_data['Arrival_Time_Hour'] = [arrival_hour]
+        input_data['Arrival_Time_Minute'] = [arrival_minute]
+        input_data['Duration_Hours'] = [duration_hours]
+        input_data['Duration_Minutes'] = [duration_minutes]
+        input_data['Journey_Day'] = [journey_day]
+        input_data['Journey_Month'] = [journey_month]
+        input_data['Days_Until_Departure'] = [days_until_departure]
+
+        input_df = pd.DataFrame(input_data)
+
+        # Make prediction
+        prediction = random_forest_model.predict(input_df)
+        st.success(f"Predicted Flight Price: ₹{prediction[0]:.2f}")
 
 else:
     st.write("Failed to load data.  Check the GitHub URL and your internet connection.")
