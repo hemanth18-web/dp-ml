@@ -36,7 +36,7 @@ def load_data_from_github(url):
 data = load_data_from_github(github_url)
 
 # --- STREAMLIT APP ---
-st.title("Flight Fare Data Exploration and Prediction2")
+st.title("Flight Fare Data Exploration and Prediction")
 
 if data is not None:
     # --- Data Cleaning and Conversion ---
@@ -233,6 +233,16 @@ if data is not None:
 
     # Split data into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    # --- Print data types and missing values for debugging ---
+    print("Data types of X_train columns:")
+    print(X_train.dtypes)
+    print("Number of missing values in X_train:")
+    print(X_train.isnull().sum())
+
+    # --- Handle missing values (if any) ---
+    X_train = X_train.fillna(X_train.mean())  # Impute missing values with the mean
+    X_test = X_test.fillna(X_test.mean())
 
     # --- Model Training ---
     st.header("Random Forest Model Training")
