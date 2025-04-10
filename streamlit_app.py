@@ -9,7 +9,7 @@ import re  # Import the regular expression module
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
-from datetime import datetime
+from datetime import datetime, date  # Import date as well
 
 # --- STREAMLIT APP ---
 st.set_page_config(page_title="Flight Fare Predictor", page_icon="✈️", layout="wide")  # MOVE THIS TO THE TOP!
@@ -247,8 +247,8 @@ if data is not None:
     data['Journey_Month'] = data['Date_of_Journey'].dt.month
 
     # Days Until Departure
-    today = datetime(2025, 4, 11)  # Use today's date as reference
-    data['Days_Until_Departure'] = (data['Date_of_Journey'] - pd.to_datetime(today)).dt.days
+    today = date(2025, 4, 11)  # Use today's date as reference (date object)
+    data['Days_Until_Departure'] = (data['Date_of_Journey'] - pd.to_datetime(today).date()).dt.days
     data.drop('Date_of_Journey', axis=1, inplace=True, errors='ignore')
 
     # Remove columns with any NaN values
@@ -345,8 +345,8 @@ if data is not None:
         with col3:
             # New inputs
             cabin_class = st.selectbox("Cabin Class", options=list(cabin_class_mapping.values()), help="Select the cabin class")
-            days_until_departure = (journey_date - datetime(2025, 4, 11)).days  # Calculate days until departure
-            #days_until_departure = st.number_input("Days Until Departure", min_value=0, max_value=365, value=30, help="Enter the number of days until departure") # Alternative input
+            reference_date = date(2025, 4, 11)
+            days_until_departure = (journey_date - reference_date).days  # Calculate days until departure
 
         st.markdown("<hr>", unsafe_allow_html=True)  # Visual divider
 
