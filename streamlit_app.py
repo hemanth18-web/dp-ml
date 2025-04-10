@@ -248,8 +248,8 @@ if data is not None:
         data['Date_of_Journey'] = pd.to_datetime(data['Date_of_Journey'], format="%Y-%m-%d %H:%M:%S", errors='raise')
         st.write(f"Date_of_Journey dtype after initial conversion: {data['Date_of_Journey'].dtype}")
 
-        # Then, explicitly extract the date
-        data['Date_of_Journey_Date'] = data['Date_of_Journey'].dt.date
+        # Then, explicitly extract the date using a lambda function
+        data['Date_of_Journey_Date'] = data['Date_of_Journey'].apply(lambda x: x.date())
         st.write(f"Date_of_Journey_Date dtype: {data['Date_of_Journey_Date'].dtype}")
 
         # Check if the conversion was successful
@@ -421,13 +421,13 @@ if data is not None:
 
     elif page == "Data Exploration":
         st.header("Explore the Flight Data")
-        st.markdown("Dive into the dataset to understand flight patterns and pricing trends.")
+        st.markdown("Enter your flight details below to get an estimated fare.")
 
-        # Info box for data exploration
+        # Info boxes for guidance
         st.markdown("""
             <div class="info-box">
-                <h3>Data Insights</h3>
-                <p>Explore various visualizations to gain insights into flight prices and related factors.</p>
+                <h3>Flight Details</h3>
+                <p>Provide information about your desired flight to get an accurate prediction.</p>
             </div>
         """, unsafe_allow_html=True)
 
