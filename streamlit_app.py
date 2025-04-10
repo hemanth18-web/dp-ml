@@ -297,11 +297,11 @@ if data is not None:
         with col2:
             st.metric("R^2 Score", f"{r2:.2f}")
 
-        st.subheader("Feature Importance")
+        st.subheader("Mutual Importance")
         feature_importance = pd.Series(random_forest_model.feature_importances_, index=X.columns).sort_values(ascending=False)
         fig_feature_importance, ax_feature_importance = plt.subplots(figsize=(10, 6))
         feature_importance.plot(kind='bar', ax=ax_feature_importance, color="#39A7FF")
-        ax_feature_importance.set_title("Feature Importance from Random Forest")
+        ax_feature_importance.set_title("Mutual Importance")
         ax_feature_importance.set_ylabel("Importance Score")
         st.pyplot(fig_feature_importance)
 
