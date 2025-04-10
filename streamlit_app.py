@@ -36,7 +36,7 @@ def load_data_from_github(url):
 data = load_data_from_github(github_url)
 
 # --- STREAMLIT APP ---
-st.title("Flight Fare Data Exploration and Prediction333")
+st.title("Flight Fare Data Exploration and Prediction11")
 
 if data is not None:
     # --- Data Cleaning and Conversion ---
@@ -226,7 +226,7 @@ if data is not None:
     data = pd.get_dummies(data, columns=['Airline', 'Source', 'Destination', 'Cabin_Class'], drop_first=True)
 
     # Update the features list to include the one-hot encoded columns
-    features = [col for col in data.columns if col not in ['Price', 'Date_of_Journey', 'Dep_Time', 'Arrival_Time', 'Duration']]  # Exclude non-feature columns
+    features = [col for col in data.columns if col not in ['Price', 'Date_of_Journey', 'Dep_Time', 'Arrival_Time', 'Duration', 'Route', 'Additional_Info', 'Flight_Layover', 'Booking_Date']]  # Exclude non-feature columns
 
     X = data[features]
     y = data['Price']
@@ -292,7 +292,7 @@ if data is not None:
     cabin_class = st.selectbox("Cabin Class", options=unique_cabin_classes)
     days_until_departure = st.slider("Days Until Departure", min_value=1, max_value=365, value=30)
 
-    # Prediction button
+        # Prediction button
     if st.button("Predict Price"):
         # Prepare input data
         input_data = {}
@@ -300,10 +300,15 @@ if data is not None:
             input_data[feature] = [0]  # Initialize all features to 0
 
         # Set the values for the user-selected features
-        input_data[f'Airline_{airline}'] = [1]  # Set the selected airline to 1
-        input_data[f'Source_{source}'] = [1]  # Set the selected source to 1
-        input_data[f'Destination_{destination}'] = [1]  # Set the selected destination to 1
-        input_data[f'Cabin_Class_{cabin_class}'] = [1]  # Set the selected cabin class to 1
+        for airline_option in unique_airlines:
+            input_data[f'Airline_{airline_option}'] = [1 if airline == airline_option else 0]
+        for source_option in unique_sources:
+            input_data[f'Source_{source_option}'] = [1 if source == source_option else 0]
+        for destination_option in unique_destinations:
+            input_data[f'Destination_{destination_option}'] = [1 if destination == destination_option else 0]
+        for cabin_class_option in unique_cabin_classes:
+            input_data[f'Cabin_Class_{cabin_class_option}'] = [1 if cabin_class == cabin_class_option else 0]
+
         input_data['Total_Stops'] = [stops]
         input_data['Dep_Time_Hour'] = [dep_hour]
         input_data['Dep_Time_Minute'] = [dep_minute]
@@ -317,9 +322,16 @@ if data is not None:
 
         input_df = pd.DataFrame(input_data)
 
+        # Ensure the input DataFrame has the same columns as the training data
+        for col in X_train.columns:
+            if col not in input_df.columns:
+                input_df[col] = 0  # Add missing columns with 0
+
+        input_df = input_df[X_train.columns]  # Ensure correct column order
+
         # Make prediction
         prediction = random_forest_model.predict(input_df)
         st.success(f"Predicted Flight Price: ₹{prediction[0]:.2f}")
 
-else:
-    st.write("Failed to load data.  Check the GitHub URL and your internet connection.")
+    else:
+        st.write("Failed to load data.  Check the GitHub URL and your internet connection.")
