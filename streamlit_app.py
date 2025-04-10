@@ -204,11 +204,29 @@ if data is not None:
     data['Destination'] = le.fit_transform(data['Destination'])
     data['Cabin_Class'] = le.fit_transform(data['Cabin_Class'])
 
+    # Print column names for debugging
+    print("Column Names Before Feature Selection:")
+    print(data.columns)
+
     # Prepare data for model training
-    print(data.columns)  # VERY IMPORTANT: Print column names to debug
-    X = data[['Airline', 'Source', 'Destination', 'Total_Stops', 'Dep_Time_Hour', 'Dep_Time_Minute',
-              'Arrival_Time_Hour', 'Arrival_Time_Minute', 'Duration_Hours', 'Duration_Minutes',
-              'Journey_Day', 'Journey_Month', 'Cabin_Class', 'Days_Until_Departure']]  # Include all features
+    # Ensure all required columns exist.  If 'Duration_Hours' or 'Duration_Minutes' are missing, calculate them.
+    if 'Duration_Hours' not in data.columns or 'Duration_Minutes' not in data.columns:
+        data['Duration'] = (data['Arrival_Time'] - data['Dep_Time']).dt.total_seconds() / 60  # Duration in minutes
+        data['Duration_Hours'] = data['Duration'] // 60
+        data['Duration_Minutes'] = data['Duration'] % 60
+
+    # Select features, handling potential missing columns
+    features = ['Airline', 'Source', 'Destination', 'Total_Stops', 'Dep_Time_Hour', 'Dep_Time_Minute',
+                'Arrival_Time_Hour', 'Arrival_Time_Minute', 'Duration_Hours', 'Duration_Minutes',
+                'Journey_Day', 'Journey_Month', 'Cabin_Class', 'Days_Until_Departure']
+
+    # Check if all features exist in the DataFrame
+    missing_features = [f for f in features if f not in data.columns]
+    if missing_features:
+        st.error(f"Missing features: {missing_features}.  Please check your data.")
+        st.stop()  # Stop execution if features are missing
+
+    X = data[features]
     y = data['Price']
 
     # Split data into training and testing sets
