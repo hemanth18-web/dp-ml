@@ -36,7 +36,7 @@ def load_data_from_github(url):
 data = load_data_from_github(github_url)
 
 # --- STREAMLIT APP ---
-st.title("Flight Fare Data Exploration and Prediction22")
+st.title("Flight Fare Data Exploration and Prediction")
 
 if data is not None:
     # --- Data Cleaning and Conversion ---
@@ -76,6 +76,15 @@ if data is not None:
     # Extract features: day, month
     data['Journey_Day'] = data['Date_of_Journey'].dt.day
     data['Journey_Month'] = data['Date_of_Journey'].dt.month
+
+    # Convert Dep_Time and Arrival_Time to datetime objects and extract features
+    data['Dep_Time'] = pd.to_datetime(data['Dep_Time'], errors='coerce')
+    data['Arrival_Time'] = pd.to_datetime(data['Arrival_Time'], errors='coerce')
+
+    data['Dep_Time_Hour'] = data['Dep_Time'].dt.hour
+    data['Dep_Time_Minute'] = data['Dep_Time'].dt.minute
+    data['Arrival_Time_Hour'] = data['Arrival_Time'].dt.hour
+    data['Arrival_Time_Minute'] = data['Arrival_Time'].dt.minute
 
     st.header("Data Preview")
     st.dataframe(data.head())
@@ -196,6 +205,7 @@ if data is not None:
     data['Cabin_Class'] = le.fit_transform(data['Cabin_Class'])
 
     # Prepare data for model training
+    print(data.columns)  # VERY IMPORTANT: Print column names to debug
     X = data[['Airline', 'Source', 'Destination', 'Total_Stops', 'Dep_Time_Hour', 'Dep_Time_Minute',
               'Arrival_Time_Hour', 'Arrival_Time_Minute', 'Duration_Hours', 'Duration_Minutes',
               'Journey_Day', 'Journey_Month', 'Cabin_Class', 'Days_Until_Departure']]  # Include all features
